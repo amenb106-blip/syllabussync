@@ -2,7 +2,6 @@ from icalendar import Calendar, Event
 
 
 def make_calendar(events):
-    """Convert event dictionaries into iCalendar (.ics) bytes."""
     cal = Calendar()
     for event in events:
         ical_event = Event()

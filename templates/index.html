@@ -2,14 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <!-- Tells phones to use their real screen width, so the page
-         isn't shrunk down to desktop size. Needed for the mobile
-         styles in style.css to take effect. -->
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SyllabusSync</title>
 
-    <!-- url_for('static', ...) builds the URL /static/style.css.
-         Flask serves everything in the static/ folder from there. -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -27,7 +22,6 @@
                           placeholder="Paste syllabus here"></textarea>
             </div>
 
-            <!-- Decorative "or" divider between the two input methods. -->
             <div class="divider">or</div>
 
             <div class="field">

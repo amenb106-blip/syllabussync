@@ -39,7 +39,6 @@ def _find_date(line, academic_start_year):
 
 
 def parse_syllabus(text, academic_start_year):
-    """Return one calendar event for each line containing a supported date."""
     events = []
     for line in text.splitlines():
         date = _find_date(line, academic_start_year)
