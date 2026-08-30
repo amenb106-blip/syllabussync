@@ -11,8 +11,6 @@ app = Flask(__name__)
 
 
 def message_page(text):
-    # Plain HTML string, but it links the same /static/style.css
-    # stylesheet the templates use so error pages match the app.
     return (
         '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
