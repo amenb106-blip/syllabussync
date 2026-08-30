@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Review Events | SyllabusSync</title>
+
+    <!-- Same single stylesheet as the home page. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <main class="container">
+        <h1>Review your events</h1>
+        <p class="subtitle">
+            Correct anything that looks wrong, or uncheck events you do not
+            want in your calendar.
+        </p>
+
+        <form method="POST" action="/download">
+            <!-- This wrapper lets the table scroll sideways on narrow
+                 phone screens instead of squashing the whole page. -->
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="col-include">Include</th>
+                            <th>Event name</th>
+                            <th class="col-date">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for event in events %}
+                        <tr>
+                            <td class="col-include">
+                                <input type="checkbox" name="include" value="{{ loop.index0 }}"
+                                       checked aria-label="Include {{ event.name }}">
+                            </td>
+                            <td>
+                                <!-- aria-label gives screen readers a name for
+                                     each input, since the table has one shared
+                                     header rather than a label per row. -->
+                                <input type="text" name="name" value="{{ event.name }}"
+                                       aria-label="Event name" required>
+                            </td>
+                            <td class="col-date">
+                                <input type="date" name="event_date" value="{{ event.date.isoformat() }}"
+                                       aria-label="Date for {{ event.name }}" required>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="actions">
+                <button type="submit">Download Calendar</button>
+                <a class="link-secondary" href="/">Start over</a>
+            </div>
+        </form>
+    </main>
+</body>
+</html>

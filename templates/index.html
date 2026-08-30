@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <!-- Tells phones to use their real screen width, so the page
+         isn't shrunk down to desktop size. Needed for the mobile
+         styles in style.css to take effect. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SyllabusSync</title>
+
+    <!-- url_for('static', ...) builds the URL /static/style.css.
+         Flask serves everything in the static/ folder from there. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <main class="container">
+        <h1>SyllabusSync</h1>
+        <p class="subtitle">
+            Paste your syllabus below, or upload it as a PDF. You will review
+            the dates before downloading your calendar.
+        </p>
+
+        <form method="POST" action="/generate" enctype="multipart/form-data">
+            <div class="field">
+                <label for="syllabus">Syllabus text</label>
+                <textarea id="syllabus" name="syllabus"
+                          placeholder="Paste syllabus here"></textarea>
+            </div>
+
+            <!-- Decorative "or" divider between the two input methods. -->
+            <div class="divider">or</div>
+
+            <div class="field">
+                <label for="pdf">Upload a PDF</label>
+                <input type="file" id="pdf" name="pdf" accept=".pdf">
+            </div>
+
+            <div class="field">
+                <label for="academic_start_year">Academic year starts in</label>
+                <input type="number" id="academic_start_year" name="academic_start_year"
+                       value="{{ current_year }}" min="2000" max="2100" required>
+                <p class="hint">
+                    Dates from August&ndash;December use this year;
+                    January&ndash;July use the next year.
+                </p>
+            </div>
+
+            <div class="actions">
+                <button type="submit">Find Events</button>
+            </div>
+        </form>
+    </main>
+</body>
+</html>
