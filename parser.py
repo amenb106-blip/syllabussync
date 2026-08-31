@@ -1,4 +1,3 @@
-"""Turn dated syllabus lines into reviewable calendar-event candidates."""
 
 import re
 from datetime import datetime
@@ -94,7 +93,6 @@ TRAILING_CONNECTOR = re.compile(r"\b(?:by|due|on)\s*[-:\u2013\u2014]*\s*$", re.I
 
 
 def _find_date(line, academic_start_year):
-    """Return the first valid date and its location in a line, if present."""
     for pattern, separator, date_format in DATE_FORMATS:
         match = pattern.search(line)
         if not match:
@@ -116,7 +114,6 @@ def _find_date(line, academic_start_year):
 
 
 def _event_name(line, date_match):
-    """Remove the date and surrounding punctuation to leave a useful title."""
     without_date = f"{line[:date_match.start()]} {line[date_match.end():]}"
     name = re.sub(r"\s+", " ", without_date).strip(" \t:-\u2013\u2014|()[]")
     name = TRAILING_CONNECTOR.sub("", name).strip(" \t:-\u2013\u2014|()[]")
@@ -127,7 +124,6 @@ def _event_name(line, date_match):
 
 
 def _classify(line):
-    """Return category, confidence, selection default, and explanation."""
     for category, pattern, confidence, reason in SELECTED_RULES:
         if pattern.search(line):
             return category, confidence, True, reason
@@ -145,7 +141,6 @@ def _classify(line):
 
 
 def parse_syllabus(text, academic_start_year):
-    """Return dated, named syllabus candidates with transparent classifications."""
     events = []
     for line in text.splitlines():
         date, date_match = _find_date(line, academic_start_year)

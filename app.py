@@ -25,7 +25,6 @@ def message_page(text):
 
 
 def get_academic_start_year():
-    """Read and validate the academic-year start chosen in the form."""
     try:
         academic_start_year = int(request.form.get("academic_start_year", ""))
     except ValueError:
@@ -42,7 +41,6 @@ def read_pdf_text(uploaded_file):
 
 
 def group_events(events):
-    """Keep related review candidates together while preserving source order."""
     grouped = OrderedDict()
     for index, event in enumerate(events):
         grouped.setdefault(event["category"], []).append({"index": index, **event})
