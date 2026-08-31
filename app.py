@@ -1,5 +1,6 @@
-from datetime import date
 import io
+from collections import OrderedDict
+from datetime import date
 
 from flask import Flask, request, render_template, send_file
 
@@ -38,6 +39,22 @@ def get_academic_start_year():
 def read_pdf_text(uploaded_file):
     reader = PdfReader(uploaded_file)
     return "\n".join(page.extract_text() or "" for page in reader.pages)
+
+
+def group_events(events):
+    """Keep related review candidates together while preserving source order."""
+    grouped = OrderedDict()
+    for index, event in enumerate(events):
+        grouped.setdefault(event["category"], []).append({"index": index, **event})
+
+    return [
+        {
+            "label": category,
+            "items": items,
+            "all_selected": all(item["default_selected"] for item in items),
+        }
+        for category, items in grouped.items()
+    ]
 
 
 @app.route("/")
@@ -84,7 +101,7 @@ def generate():
             'formats like "October 12", "Oct 12" and "10/5".'
         )
 
-    return render_template("review.html", events=events)
+    return render_template("review.html", groups=group_events(events))
 
 
 @app.route("/download", methods=["POST"])

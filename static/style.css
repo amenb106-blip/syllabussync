@@ -259,6 +259,63 @@ tbody tr:last-child td {
     border-bottom: none;
 }
 
+.event-group {
+    margin-top: 28px;
+}
+
+.event-group-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 10px;
+}
+
+.event-group h2 {
+    font-size: 18px;
+    margin: 0;
+}
+
+.event-group p {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin: 2px 0 0;
+}
+
+.select-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    white-space: nowrap;
+}
+
+.reason {
+    color: var(--text-muted);
+    font-size: 14px;
+    min-width: 230px;
+}
+
+.confidence {
+    display: inline-block;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    margin: 0 6px 4px 0;
+    padding: 4px 7px;
+}
+
+.confidence-high {
+    color: #0b6b3a;
+    background: #e7f6ed;
+}
+
+.confidence-low {
+    color: #805200;
+    background: #fff4d6;
+}
+
 /* Keep the checkbox column narrow and the date column tidy. */
 .col-include {
     width: 80px;
@@ -296,5 +353,10 @@ tbody tr:last-child td {
     /* A full-width button is easier to tap with a thumb. */
     .actions button {
         width: 100%;
+    }
+
+    .event-group-heading {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }

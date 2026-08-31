@@ -11,40 +11,65 @@
     <main class="container">
         <h1>Review your events</h1>
         <p class="subtitle">
-            Correct anything that looks wrong, or uncheck events you do not
-            want in your calendar.
+            Clear deadline and schedule-change events are selected for you.
+            Other dated items stay available below so you can choose what belongs in your calendar.
         </p>
 
         <form method="POST" action="/download">
-            <div class="table-scroll">
-                <table>
-                    <thead>
-                        <tr>
-                            <th class="col-include">Include</th>
-                            <th>Event name</th>
-                            <th class="col-date">Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for event in events %}
-                        <tr>
-                            <td class="col-include">
-                                <input type="checkbox" name="include" value="{{ loop.index0 }}"
-                                       checked aria-label="Include {{ event.name }}">
-                            </td>
-                            <td>
-                                <input type="text" name="name" value="{{ event.name }}"
-                                       aria-label="Event name" required>
-                            </td>
-                            <td class="col-date">
-                                <input type="date" name="event_date" value="{{ event.date.isoformat() }}"
-                                       aria-label="Date for {{ event.name }}" required>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            {% for group in groups %}
+            {% set group_id = "category-" ~ loop.index0 %}
+            <section class="event-group" aria-labelledby="{{ group_id }}-heading">
+                <div class="event-group-heading">
+                    <div>
+                        <h2 id="{{ group_id }}-heading">{{ group.label }}</h2>
+                        <p>Choose this whole group, or edit individual events below.</p>
+                    </div>
+                    <label class="select-group">
+                        <input type="checkbox" class="category-toggle" data-group="{{ group_id }}"
+                               {% if group.all_selected %}checked{% endif %}
+                               aria-label="Include all {{ group.label }} events">
+                        Include group
+                    </label>
+                </div>
+
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="col-include">Include</th>
+                                <th>Event name</th>
+                                <th class="col-date">Date</th>
+                                <th>Why it was grouped here</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in group["items"] %}
+                            <tr>
+                                <td class="col-include">
+                                    <input type="checkbox" class="event-toggle" data-group="{{ group_id }}"
+                                           name="include" value="{{ event.index }}"
+                                           {% if event.default_selected %}checked{% endif %}
+                                           aria-label="Include {{ event.name }}">
+                                </td>
+                                <td>
+                                    <input type="text" name="name" value="{{ event.name }}"
+                                           aria-label="Event name" required>
+                                </td>
+                                <td class="col-date">
+                                    <input type="date" name="event_date" value="{{ event.date.isoformat() }}"
+                                           aria-label="Date for {{ event.name }}" required>
+                                </td>
+                                <td class="reason">
+                                    <span class="confidence confidence-{{ event.confidence }}">{{ event.confidence }} confidence</span>
+                                    {{ event.reason }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            {% endfor %}
 
             <div class="actions">
                 <button type="submit">Download Calendar</button>
@@ -52,5 +77,36 @@
             </div>
         </form>
     </main>
+
+    <script>
+        const groupToggles = document.querySelectorAll(".category-toggle");
+
+        function updateGroupToggle(groupToggle) {
+            const events = document.querySelectorAll(
+                `.event-toggle[data-group="${groupToggle.dataset.group}"]`
+            );
+            const selectedCount = [...events].filter((event) => event.checked).length;
+            groupToggle.checked = selectedCount === events.length;
+            groupToggle.indeterminate = selectedCount > 0 && selectedCount < events.length;
+        }
+
+        groupToggles.forEach((groupToggle) => {
+            const events = document.querySelectorAll(
+                `.event-toggle[data-group="${groupToggle.dataset.group}"]`
+            );
+            updateGroupToggle(groupToggle);
+
+            groupToggle.addEventListener("change", () => {
+                events.forEach((event) => {
+                    event.checked = groupToggle.checked;
+                });
+                groupToggle.indeterminate = false;
+            });
+
+            events.forEach((event) => {
+                event.addEventListener("change", () => updateGroupToggle(groupToggle));
+            });
+        });
+    </script>
 </body>
 </html>

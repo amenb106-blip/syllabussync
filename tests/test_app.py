@@ -36,6 +36,42 @@ def test_generate_shows_review_page_and_rolls_spring_dates_forward(client):
     assert b"2027-05-10" in response.data
 
 
+def test_generate_groups_candidates_and_only_selects_actionable_events(client):
+    response = client.post(
+        "/generate",
+        data={
+            "syllabus": "Assignment due: October 12\nRead Chapter 3: October 14",
+            "academic_start_year": "2026",
+        },
+    )
+
+    assert response.status_code == 200
+    assert b"Deadlines" in response.data
+    assert b"Readings" in response.data
+    assert b"Deadline keyword found." in response.data
+    assert response.data.count(b'name="include"') == 2
+    assert response.data.count(b'name="include" value="0"\n                                           checked') == 1
+
+
+def test_pdf_extracted_text_remains_reviewable(client, monkeypatch):
+    monkeypatch.setattr(
+        "app.read_pdf_text", lambda _file: "Quiz: October 12\nOffice hours: October 14"
+    )
+
+    response = client.post(
+        "/generate",
+        data={
+            "academic_start_year": "2026",
+            "pdf": (io.BytesIO(b"placeholder"), "syllabus.pdf"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    assert b"Assessments" in response.data
+    assert b"Office hours" in response.data
+
+
 def test_generate_rejects_empty_syllabus(client):
     response = client.post("/generate", data={"syllabus": "", "academic_start_year": "2026"})
 
