@@ -1,40 +1,20 @@
-/* ============================================================
-   SyllabusSync stylesheet
-   ------------------------------------------------------------
-   Flask automatically serves any file inside the "static/"
-   folder at the URL "/static/<filename>". This file lives at
-   static/style.css, so the browser can fetch it at
-   /static/style.css. In the templates we link it with
-   url_for('static', filename='style.css'), which builds that
-   URL for us.
-   ============================================================ */
-
-
-/* ---- 1. Design tokens ------------------------------------
-   CSS variables ("custom properties") let us name our colours
-   and sizes once, then reuse them everywhere below. Change a
-   value here and it updates across the whole site. */
 :root {
-    --accent:        #2f6fed;   /* the one brand colour: buttons, links, focus */
-    --accent-dark:   #2456bd;   /* darker shade, used on hover */
-    --accent-soft:   #eaf1fe;   /* very light tint, used for table headers */
+    --accent:        #2f6fed;
+    --accent-dark:   #2456bd;
+    --accent-soft:   #eaf1fe;
 
-    --text:          #14181f;   /* near-black body text (high contrast) */
-    --text-muted:    #5b6472;   /* grey for helper text, still readable */
-    --border:        #dfe3ea;   /* light grey lines */
-    --page-bg:       #f5f7fa;   /* soft grey page background */
-    --card-bg:       #ffffff;   /* white card sitting on the page */
-    --danger:        #b42318;   /* red, for error messages */
+    --text:          #14181f;
+    --text-muted:    #5b6472;
+    --border:        #dfe3ea;
+    --page-bg:       #f5f7fa;
+    --card-bg:       #ffffff;
+    --danger:        #b42318;
 
-    --radius:        10px;      /* rounded corner size */
-    --max-width:     720px;     /* how wide the centred container gets */
+    --radius:        10px;
+    --max-width:     720px;
 }
 
 
-/* ---- 2. Base page ---------------------------------------- */
-
-/* border-box makes padding count *inside* an element's width,
-   which stops inputs from overflowing their container. */
 *,
 *::before,
 *::after {
@@ -42,8 +22,6 @@
 }
 
 body {
-    /* A "system font stack": use whatever clean font the visitor's
-       device already has, so nothing needs downloading. */
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
                  Roboto, "Helvetica Neue", Arial, sans-serif;
     font-size: 16px;
@@ -51,15 +29,13 @@ body {
     color: var(--text);
     background-color: var(--page-bg);
     margin: 0;
-    padding: 32px 16px;   /* breathing room, including on small screens */
+    padding: 32px 16px;
 }
 
 
-/* ---- 3. The centred card --------------------------------
-   Every page wraps its content in <main class="container">. */
 .container {
     max-width: var(--max-width);
-    margin: 0 auto;                 /* centres the box horizontally */
+    margin: 0 auto;
     background-color: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -68,21 +44,18 @@ body {
 }
 
 
-/* ---- 4. Text --------------------------------------------- */
 h1 {
     font-size: 28px;
     line-height: 1.25;
     margin: 0 0 8px;
-    letter-spacing: -0.02em;   /* slightly tighter = more polished */
+    letter-spacing: -0.02em;
 }
 
-/* The short line of explanation under each heading. */
 .subtitle {
     color: var(--text-muted);
     margin: 0 0 28px;
 }
 
-/* Small grey hint text under a form field. */
 .hint {
     font-size: 14px;
     color: var(--text-muted);
@@ -98,10 +71,6 @@ a:hover {
 }
 
 
-/* ---- 5. Form fields -------------------------------------- */
-
-/* Each label + input pair is wrapped in <div class="field">
-   so we get consistent vertical spacing between them. */
 .field {
     margin-bottom: 24px;
 }
@@ -119,7 +88,7 @@ input[type="text"],
 input[type="date"],
 input[type="file"] {
     width: 100%;
-    font: inherit;                  /* match the body font, not the browser default */
+    font: inherit;
     color: var(--text);
     background-color: #fff;
     padding: 10px 12px;
@@ -130,11 +99,9 @@ input[type="file"] {
 
 textarea {
     min-height: 220px;
-    resize: vertical;               /* let people drag it taller, not wider */
+    resize: vertical;
 }
 
-/* :focus-visible highlights the field currently being typed in.
-   This matters for keyboard users, so never remove it. */
 textarea:focus-visible,
 input:focus-visible {
     outline: none;
@@ -142,15 +109,13 @@ input:focus-visible {
     box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-/* Checkboxes should not stretch to full width like text inputs. */
 input[type="checkbox"] {
     width: 18px;
     height: 18px;
-    accent-color: var(--accent);    /* tints the checkmark with our brand colour */
+    accent-color: var(--accent);
     cursor: pointer;
 }
 
-/* Give buttons, links and checkboxes a visible focus ring too. */
 button:focus-visible,
 a:focus-visible,
 input[type="checkbox"]:focus-visible {
@@ -159,7 +124,6 @@ input[type="checkbox"]:focus-visible {
 }
 
 
-/* ---- 6. Buttons ------------------------------------------ */
 button {
     font: inherit;
     font-weight: 600;
@@ -177,10 +141,9 @@ button:hover {
 }
 
 button:active {
-    transform: translateY(1px);     /* tiny press-down effect */
+    transform: translateY(1px);
 }
 
-/* A quieter, text-only link that sits next to a button. */
 .link-secondary {
     color: var(--text-muted);
     text-decoration: none;
@@ -192,18 +155,15 @@ button:active {
     text-decoration: underline;
 }
 
-/* Row holding the submit button and any secondary link. */
 .actions {
     display: flex;
     align-items: center;
     gap: 20px;
-    flex-wrap: wrap;                /* stack them if the screen is narrow */
+    flex-wrap: wrap;
     margin-top: 28px;
 }
 
 
-/* ---- 7. A thin divider with a word in the middle ---------
-   Used between the paste box and the PDF upload ("or"). */
 .divider {
     display: flex;
     align-items: center;
@@ -213,20 +173,15 @@ button:active {
     margin: 24px 0;
 }
 
-/* The ::before and ::after pseudo-elements draw the two lines. */
 .divider::before,
 .divider::after {
     content: "";
-    flex: 1;                        /* each line takes an equal share of the leftover space */
+    flex: 1;
     height: 1px;
     background-color: var(--border);
 }
 
 
-/* ---- 8. The review table --------------------------------- */
-
-/* Wrapper that lets a wide table scroll sideways on a phone
-   instead of stretching the whole page. */
 .table-scroll {
     overflow-x: auto;
     border: 1px solid var(--border);
@@ -235,7 +190,7 @@ button:active {
 
 table {
     width: 100%;
-    border-collapse: collapse;      /* single shared borders, not doubled ones */
+    border-collapse: collapse;
 }
 
 th,
@@ -253,8 +208,6 @@ th {
     color: var(--text);
 }
 
-/* Remove the line under the very last row so it meets the
-   rounded corner cleanly. */
 tbody tr:last-child td {
     border-bottom: none;
 }
@@ -316,7 +269,6 @@ tbody tr:last-child td {
     background: #fff4d6;
 }
 
-/* Keep the checkbox column narrow and the date column tidy. */
 .col-include {
     width: 80px;
     text-align: center;
@@ -327,16 +279,12 @@ tbody tr:last-child td {
 }
 
 
-/* ---- 9. Message / error pages ---------------------------- */
 .message {
     color: var(--danger);
     margin: 0 0 20px;
 }
 
 
-/* ---- 10. Mobile tweaks -----------------------------------
-   Anything inside this block only applies when the screen is
-   600px wide or narrower (phones). */
 @media (max-width: 600px) {
     body {
         padding: 16px 12px;
@@ -350,7 +298,6 @@ tbody tr:last-child td {
         font-size: 24px;
     }
 
-    /* A full-width button is easier to tap with a thumb. */
     .actions button {
         width: 100%;
     }
