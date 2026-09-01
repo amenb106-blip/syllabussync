@@ -12,16 +12,7 @@ app = Flask(__name__)
 
 
 def message_page(text):
-    return (
-        '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        "<title>SyllabusSync</title>"
-        '<link rel="stylesheet" href="/static/style.css">'
-        '</head><body><main class="container">'
-        f'<h1>SyllabusSync</h1><p class="message">{text}</p>'
-        '<p><a href="/">Go back</a></p>'
-        "</main></body></html>"
-    )
+    return render_template("error.html", text=text)
 
 
 def get_academic_start_year():
