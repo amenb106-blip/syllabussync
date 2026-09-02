@@ -1,4 +1,5 @@
 import io
+import os
 from collections import OrderedDict
 from datetime import date
 
@@ -140,4 +141,6 @@ def download():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Debug mode exposes an interactive debugger, so it is off unless
+    # explicitly enabled for local development with FLASK_DEBUG=1.
+    app.run(debug=os.environ.get("FLASK_DEBUG") == "1")
