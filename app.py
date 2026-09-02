@@ -42,18 +42,22 @@ def read_pdf_text(uploaded_file):
 
 def group_events(events):
     grouped = OrderedDict()
-    for index, event in enumerate(events):
-        grouped.setdefault(event["category"], []).append({"index": index, **event})
-
-    return [
-        {
+    for event in events:
+        grouped.setdefault(event["category"], []).append(event)
+        
+    result = []
+    render_index = 0
+    for category, items in grouped.items():
+        numbered_items = []
+        for event in items:
+            numbered_items.append({"index": render_index, **event})
+            render_index += 1
+        result.append({
             "label": category,
-            "items": items,
-            "all_selected": all(item["default_selected"] for item in items),
-        }
-        for category, items in grouped.items()
-    ]
-
+            "items": numbered_items,
+            "all_selected": all(item["default_selected"] for item in numbered_items),
+        })
+    return result
 
 @app.route("/")
 def home():

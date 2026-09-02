@@ -3,6 +3,8 @@ import io
 import pytest
 from icalendar import Calendar
 from werkzeug.datastructures import MultiDict
+from parser import parse_syllabus
+from app import group_events
 
 from app import app
 
@@ -120,3 +122,36 @@ def test_download_uses_edited_events_and_ignores_unchecked_ones(client):
     assert len(events) == 1
     assert str(events[0]["SUMMARY"]) == "Updated Midterm"
     assert events[0].decoded("DTSTART").isoformat() == "2026-10-15"
+
+def test_download_matches_selection_when_categories_interleave(client):
+    syllabus = "Assignment due: Oct 12\nRead ch 3: Oct 13\nQuiz: Oct 14\nHomework due: Oct 15"
+
+    response = client.post(
+        "/generate",
+        data={"syllabus": syllabus, "academic_start_year": "2026"},
+    )
+    assert response.status_code == 200
+
+
+    groups = group_events(parse_syllabus(syllabus, 2026))
+
+    form = []
+    for group in groups:
+        for item in group["items"]:
+            form.append(("name", item["name"]))
+            form.append(("event_date", item["date"].isoformat()))
+            if item["default_selected"]:
+                form.append(("include", str(item["index"])))
+
+    download = client.post("/download", data=MultiDict(form))
+    assert download.status_code == 200
+
+    calendar = Calendar.from_ical(download.data)
+    summaries = {
+        str(component["SUMMARY"])
+        for component in calendar.walk()
+        if component.name == "VEVENT"
+    }
+
+    assert summaries == {"Assignment", "Homework", "Quiz"}
+    assert "Read ch 3" not in summaries
