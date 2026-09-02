@@ -7,3 +7,6 @@ __pycache__/
 *.ics
 desktop.ini
 .pytest_cache/
+
+PROJECT_OVERVIEW.md
+DESIGN_NOTES.md
