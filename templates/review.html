@@ -4,109 +4,128 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Review Events | SyllabusSync</title>
-
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <main class="container">
-        <h1>Review your events</h1>
-        <p class="subtitle">
-            Clear deadline and schedule-change events are selected for you.
-            Other dated items stay available below so you can choose what belongs in your calendar.
-        </p>
+    <header class="site-header">
+        <a class="brand" href="/" aria-label="SyllabusSync home">
+            <span class="brand-mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M7 3v4M17 3v4M3 10h18M8 15l2.5 2.5L16 12"></path></svg>
+            </span>
+            <span>SyllabusSync</span>
+        </a>
+        <a class="header-link" href="/">Start over</a>
+    </header>
+
+    <main class="review-page">
+        <div class="review-heading">
+            <div>
+                <h1 class="review-title">Review your events</h1>
+                <p class="subtitle">Clear deadlines are already selected. Fix a name or date inline, and untick anything that doesn't belong.</p>
+            </div>
+            <p class="summary-pill"><span id="date-count">0</span> dates found &middot; <span id="selected-count">0</span> selected</p>
+        </div>
 
         <form method="POST" action="/download">
-            {% for group in groups %}
-            {% set group_id = "category-" ~ loop.index0 %}
-            <section class="event-group" aria-labelledby="{{ group_id }}-heading">
-                <div class="event-group-heading">
-                    <div>
-                        <h2 id="{{ group_id }}-heading">{{ group.label }}</h2>
-                        <p>Choose this whole group, or edit individual events below.</p>
+            <div class="event-groups">
+                {% for group in groups %}
+                {% set group_id = "category-" ~ loop.index0 %}
+                <section class="event-group" aria-labelledby="{{ group_id }}-heading">
+                    <div class="event-group-heading">
+                        <div>
+                            <h2 id="{{ group_id }}-heading">{{ group.label }}</h2>
+                            <p>Choose this whole group, or edit individual events below.</p>
+                        </div>
+                        <label class="select-group">
+                            <input type="checkbox" class="category-toggle" data-group="{{ group_id }}" {% if group.all_selected %}checked{% endif %} aria-label="Include all {{ group.label }} events">
+                            Include group
+                        </label>
                     </div>
-                    <label class="select-group">
-                        <input type="checkbox" class="category-toggle" data-group="{{ group_id }}"
-                               {% if group.all_selected %}checked{% endif %}
-                               aria-label="Include all {{ group.label }} events">
-                        Include group
-                    </label>
-                </div>
 
-                <div class="table-scroll">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th class="col-include">Include</th>
-                                <th>Event name</th>
-                                <th class="col-date">Date</th>
-                                <th>Why it was grouped here</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                    <div class="event-table">
+                        <div class="event-grid">
+                            <div class="event-grid-header" aria-hidden="true">
+                                <span>Include</span><span>Event name</span><span>Date</span><span>Why it's here</span>
+                            </div>
                             {% for event in group["items"] %}
-                            <tr>
-                                <td class="col-include">
+                            <div class="event-row">
+                                <div class="include-cell">
                                     <input type="checkbox" class="event-toggle" data-group="{{ group_id }}"
                                            name="include" value="{{ event.index }}"
                                            {% if event.default_selected %}checked{% endif %}
                                            aria-label="Include {{ event.name }}">
-                                </td>
-                                <td>
-                                    <input type="text" name="name" value="{{ event.name }}"
-                                           aria-label="Event name" required>
-                                </td>
-                                <td class="col-date">
-                                    <input type="date" name="event_date" value="{{ event.date.isoformat() }}"
-                                           aria-label="Date for {{ event.name }}" required>
-                                </td>
-                                <td class="reason">
-                                    <span class="confidence confidence-{{ event.confidence }}">{{ event.confidence }} confidence</span>
-                                    {{ event.reason }}
-                                </td>
-                            </tr>
+                                </div>
+                                <div>
+                                    <input type="text" name="name" value="{{ event.name }}" aria-label="Event name" required>
+                                </div>
+                                <div>
+                                    <input type="date" name="event_date" value="{{ event.date.isoformat() }}" aria-label="Date for {{ event.name }}" required>
+                                </div>
+                                <div class="reason">
+                                    <span class="confidence confidence-{{ event.confidence }}">{{ event.confidence }} confidence</span>{{ event.reason }}
+                                </div>
+                            </div>
                             {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-            {% endfor %}
+                        </div>
+                    </div>
+                </section>
+                {% endfor %}
+            </div>
 
-            <div class="actions">
-                <button type="submit">Download Calendar</button>
-                <a class="link-secondary" href="/">Go Back</a>
+            <div class="action-bar">
+                <div class="action-bar-inner">
+                    <p class="selection-summary"><strong id="bar-selected-count">0 events</strong> will be added to your calendar</p>
+                    <div class="action-buttons">
+                        <a class="link-secondary" href="/">Start over</a>
+                        <button class="button" type="submit">
+                            <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 20h14"></path></svg>
+                            Download calendar (.ics)
+                        </button>
+                    </div>
+                </div>
             </div>
         </form>
     </main>
 
     <script>
         const groupToggles = document.querySelectorAll(".category-toggle");
+        const eventToggles = document.querySelectorAll(".event-toggle");
+
+        function updateSelectionSummary() {
+            const total = eventToggles.length;
+            const selected = [...eventToggles].filter((event) => event.checked).length;
+            document.querySelector("#date-count").textContent = total;
+            document.querySelector("#selected-count").textContent = selected;
+            document.querySelector("#bar-selected-count").textContent = `${selected} ${selected === 1 ? "event" : "events"}`;
+        }
 
         function updateGroupToggle(groupToggle) {
-            const events = document.querySelectorAll(
-                `.event-toggle[data-group="${groupToggle.dataset.group}"]`
-            );
+            const events = document.querySelectorAll(`.event-toggle[data-group="${groupToggle.dataset.group}"]`);
             const selectedCount = [...events].filter((event) => event.checked).length;
             groupToggle.checked = selectedCount === events.length;
             groupToggle.indeterminate = selectedCount > 0 && selectedCount < events.length;
         }
 
         groupToggles.forEach((groupToggle) => {
-            const events = document.querySelectorAll(
-                `.event-toggle[data-group="${groupToggle.dataset.group}"]`
-            );
+            const events = document.querySelectorAll(`.event-toggle[data-group="${groupToggle.dataset.group}"]`);
             updateGroupToggle(groupToggle);
 
             groupToggle.addEventListener("change", () => {
-                events.forEach((event) => {
-                    event.checked = groupToggle.checked;
-                });
+                events.forEach((event) => { event.checked = groupToggle.checked; });
                 groupToggle.indeterminate = false;
+                updateSelectionSummary();
             });
 
             events.forEach((event) => {
-                event.addEventListener("change", () => updateGroupToggle(groupToggle));
+                event.addEventListener("change", () => {
+                    updateGroupToggle(groupToggle);
+                    updateSelectionSummary();
+                });
             });
         });
+
+        updateSelectionSummary();
     </script>
 </body>
 </html>
