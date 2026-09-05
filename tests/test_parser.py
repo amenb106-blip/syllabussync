@@ -53,6 +53,9 @@ def test_holidays_cancellations_and_special_sessions_are_selected():
         2026,
     )
 
+    assert [event["name"] for event in events] == [
+        "No class", "Guest lecture", "Thanksgiving holiday"
+    ]
     assert all(event["default_selected"] for event in events)
     assert all(event["category"] == "Schedule changes" for event in events)
 

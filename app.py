@@ -1,6 +1,5 @@
 import io
 import os
-from collections import OrderedDict
 from datetime import date
 
 from flask import Flask, request, render_template, send_file
@@ -33,7 +32,7 @@ def read_pdf_text(uploaded_file):
 
 
 def group_events(events):
-    grouped = OrderedDict()
+    grouped = {}
     for event in events:
         grouped.setdefault(event["category"], []).append(event)
         

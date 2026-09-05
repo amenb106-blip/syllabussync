@@ -163,14 +163,3 @@ def parse_syllabus(text, academic_start_year):
             }
         )
     return events
-
-
-if __name__ == "__main__":
-    sample = """Welcome to Bio 101
-Midterm: October 12
-Read Chapter 4: Oct 20
-Lab report due 11/3
-Final Exam: December 15"""
-
-    for event in parse_syllabus(sample, 2026):
-        print(event)

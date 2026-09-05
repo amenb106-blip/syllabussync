@@ -1,12 +1,22 @@
 import io
+from html.parser import HTMLParser
 
 import pytest
 from icalendar import Calendar
 from werkzeug.datastructures import MultiDict
-from parser import parse_syllabus
-from app import group_events
 
 from app import app
+
+
+class InputParser(HTMLParser):
+    def __init__(self, html):
+        super().__init__()
+        self.inputs = []
+        self.feed(html)
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "input":
+            self.inputs.append(dict(attrs))
 
 
 @pytest.fixture()
@@ -51,8 +61,13 @@ def test_generate_groups_candidates_and_only_selects_actionable_events(client):
     assert b"Deadlines" in response.data
     assert b"Readings" in response.data
     assert b"Deadline keyword found." in response.data
-    assert response.data.count(b'name="include"') == 2
-    assert response.data.count(b'name="include" value="0"\n                                           checked') == 1
+    checkboxes = [
+        field for field in InputParser(response.get_data(as_text=True)).inputs
+        if field.get("name") == "include"
+    ]
+    assert [(field["value"], "checked" in field) for field in checkboxes] == [
+        ("0", True), ("1", False)
+    ]
 
 
 def test_pdf_extracted_text_remains_reviewable(client, monkeypatch):
@@ -77,7 +92,7 @@ def test_pdf_extracted_text_remains_reviewable(client, monkeypatch):
 def test_generate_rejects_empty_syllabus(client):
     response = client.post("/generate", data={"syllabus": "", "academic_start_year": "2026"})
 
-    assert b"didn't give us anything" in response.data
+    assert b"give us anything to read" in response.data
 
 
 def test_generate_rejects_invalid_academic_year(client):
@@ -98,7 +113,7 @@ def test_generate_rejects_an_unreadable_pdf(client):
         content_type="multipart/form-data",
     )
 
-    assert b"couldn't read that file" in response.data
+    assert b"read that file. Make sure" in response.data
 
 
 def test_download_uses_edited_events_and_ignores_unchecked_ones(client):
@@ -133,15 +148,13 @@ def test_download_matches_selection_when_categories_interleave(client):
     assert response.status_code == 200
 
 
-    groups = group_events(parse_syllabus(syllabus, 2026))
-
-    form = []
-    for group in groups:
-        for item in group["items"]:
-            form.append(("name", item["name"]))
-            form.append(("event_date", item["date"].isoformat()))
-            if item["default_selected"]:
-                form.append(("include", str(item["index"])))
+    form = [
+        (field["name"], field.get("value", ""))
+        for field in InputParser(response.get_data(as_text=True)).inputs
+        if "name" in field
+        and "disabled" not in field
+        and (field.get("type") != "checkbox" or "checked" in field)
+    ]
 
     download = client.post("/download", data=MultiDict(form))
     assert download.status_code == 200
@@ -154,4 +167,3 @@ def test_download_matches_selection_when_categories_interleave(client):
     }
 
     assert summaries == {"Assignment", "Homework", "Quiz"}
-    assert "Read ch 3" not in summaries

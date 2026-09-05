@@ -44,6 +44,7 @@ To enable Flask's debugger and auto-reload while developing, set `FLASK_DEBUG=1`
 ## Run the tests
 
 ```bash
+pip install -r requirements-dev.txt
 python -m pytest
 ```
 
