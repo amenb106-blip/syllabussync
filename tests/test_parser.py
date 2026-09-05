@@ -1,5 +1,7 @@
 from datetime import date
 
+import pytest
+
 from parser import parse_syllabus
 
 
@@ -86,3 +88,29 @@ def test_date_at_the_start_of_a_line_is_removed_from_the_event_name():
     events = parse_syllabus("October 12 - Midterm Exam", 2026)
 
     assert events[0]["name"] == "Midterm Exam"
+
+
+@pytest.mark.parametrize(
+    "date_text, expected",
+    [
+        ("May 10, 2026", date(2026, 5, 10)),
+        ("October 12 2027", date(2027, 10, 12)),
+        ("Oct. 12, 2025", date(2025, 10, 12)),
+        ("Oct 12 2027", date(2027, 10, 12)),
+        ("5/10/2026", date(2026, 5, 10)),
+        ("10/12/2025", date(2025, 10, 12)),
+        ("February 29, 2024", date(2024, 2, 29)),
+        ("2/29/2024", date(2024, 2, 29)),
+    ],
+)
+def test_explicit_year_overrides_academic_year(date_text, expected):
+    events = parse_syllabus(f"{date_text} - Final Exam", 2026)
+
+    assert len(events) == 1
+    assert events[0]["date"] == expected
+    assert events[0]["name"] == "Final Exam"
+
+
+@pytest.mark.parametrize("date_text", ["February 29, 2025", "2/29/2025", "May 10, 0000"])
+def test_invalid_explicit_dates_do_not_fall_back_to_academic_year(date_text):
+    assert parse_syllabus(f"Final Exam: {date_text}", 2023) == []

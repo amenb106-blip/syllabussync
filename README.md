@@ -13,7 +13,9 @@ Paste your syllabus text or upload the PDF. SyllabusSync finds the exams, assign
 3. **Review** – events are grouped (Assessments, Deadlines, Readings, etc.). Clear deadlines are pre-selected; you can fix names and dates or untick anything that doesn't belong.
 4. **Download** – the selected events are written to a standard `.ics` file as all-day events.
 
-Dates from August–December use the chosen start year; January–July roll forward to the next year, so a Fall 2026 / Spring 2027 course just needs `2026`.
+Dates without a year use the chosen academic year: August–December use the start year and January–July roll forward to the next year. A four-digit year written in the syllabus takes priority, including formats such as `May 10, 2026`, `Oct 12 2027`, and `5/10/2026`.
+
+Calendar exports include calendar metadata, UTC timestamps, and stable event IDs based on each event's name and date. Identical names and dates share an ID, including across courses; editing either produces a new ID. Import behavior depends on the calendar app, so repeated imports are not guaranteed to avoid duplicates.
 
 ## Project structure
 

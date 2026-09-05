@@ -5,14 +5,15 @@ from datetime import datetime
 
 FULL_MONTH = re.compile(
     r"\b(January|February|March|April|May|June|July|August|"
-    r"September|October|November|December)\s+(\d{1,2})\b",
+    r"September|October|November|December)\s+(\d{1,2})\b(?:,?\s+(\d{4})\b)?",
     re.IGNORECASE,
 )
 ABBREV_MONTH = re.compile(
-    r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+(\d{1,2})\b",
+    r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+(\d{1,2})\b"
+    r"(?:,?\s+(\d{4})\b)?",
     re.IGNORECASE,
 )
-NUMERIC = re.compile(r"\b(\d{1,2})/(\d{1,2})\b")
+NUMERIC = re.compile(r"\b(\d{1,2})/(\d{1,2})\b(?:/(\d{4})\b)?(?!/\d)")
 
 DATE_FORMATS = [
     (FULL_MONTH, " ", "%B %d %Y"),
@@ -20,8 +21,6 @@ DATE_FORMATS = [
     (NUMERIC, "/", "%m/%d/%Y"),
 ]
 
-# These rules deliberately describe syllabus language rather than trying to
-# guess from the date alone. That keeps the parser predictable and testable.
 SELECTED_RULES = [
     (
         "Assessments",
@@ -98,14 +97,15 @@ def _find_date(line, academic_start_year):
         if not match:
             continue
 
-        month, day = match.group(1), match.group(2)
+        month, day, explicit_year = match.groups()
         try:
-            # Use a leap year while identifying the month, then apply the
-            # selected academic-year rule to the event itself.
-            month_number = datetime.strptime(
-                separator.join([month, day, "2000"]), date_format
-            ).month
-            event_year = academic_start_year + (1 if month_number <= 7 else 0)
+            if explicit_year is not None:
+                event_year = int(explicit_year)
+            else:
+                month_number = datetime.strptime(
+                    separator.join([month, day, "2000"]), date_format
+                ).month
+                event_year = academic_start_year + (1 if month_number <= 7 else 0)
             date_text = separator.join([month, day, str(event_year)])
             return datetime.strptime(date_text, date_format).date(), match
         except ValueError:
