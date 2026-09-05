@@ -127,7 +127,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .field[hidden] { display: none; }
 label { display: block; margin-bottom: 7px; font-size: 14px; font-weight: 600; }
 
-textarea, input[type="number"], input[type="text"], input[type="date"], input[type="file"] {
+textarea, input[type="number"], input[type="text"], input[type="date"], input[type="time"], input[type="file"] {
     width: 100%;
     color: var(--text);
     background: #fff;

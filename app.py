@@ -11,6 +11,17 @@ from pdf_text import read_pdf_text
 app = Flask(__name__)
 
 
+@app.context_processor
+def static_asset_version():
+    def asset_version(filename):
+        try:
+            return int(os.path.getmtime(os.path.join(app.static_folder, filename)))
+        except OSError:
+            return 0
+
+    return {"asset_version": asset_version}
+
+
 def message_page(text):
     return render_template("error.html", text=text)
 
