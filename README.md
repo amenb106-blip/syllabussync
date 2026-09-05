@@ -17,9 +17,13 @@ Dates without a year use the chosen academic year: August–December use the sta
 
 Calendar exports include calendar metadata, UTC timestamps, and stable event IDs based on each event's name and date. Identical names and dates share an ID, including across courses; editing either produces a new ID. Import behavior depends on the calendar app, so repeated imports are not guaranteed to avoid duplicates.
 
-PDF extraction preserves page layout and joins wrapped cells in weekly schedule tables. Exam headings are carried into section-specific dates, and conditional or example dates are left unselected for review. Exam windows written with full start and end dates are shown as one all-day event on the closing date, with the date range in its name. Consult the syllabus for exact opening and closing times.
+PDF extraction preserves page layout and joins wrapped cells in weekly schedule tables. Bordered tables with a Date column and one date per row keep the whole topic cell attached to that date, including vertically centered dates. Exam headings are carried into section-specific dates, and conditional or example dates are left unselected for review. Exam windows written with full start and end dates are shown as one all-day event on the closing date, with the date range in its name. Consult the syllabus for exact opening and closing times.
 
-Always review the results: unusual table layouts, scanned PDFs, abbreviated date ranges, and repeated events described differently can still require manual correction. If a syllabus lists several course sections, select the events for your section.
+Possible repeated exam summaries are left unchecked when a section-specific entry already names that assessment on the same date. They remain available with an explanation so you can include them if they represent a separate event. Different sections and exam numbers stay separate.
+
+Scanned pages without readable text are not processed. If a PDF also has readable pages, the review identifies the skipped page numbers; a fully scanned PDF asks you to paste the text instead. OCR is not included.
+
+Always review the results: unusual or borderless tables, abbreviated date ranges, and repeated events described differently can still require manual correction. If a syllabus lists several course sections, select the events for your section.
 
 ## Project structure
 
@@ -27,7 +31,7 @@ Always review the results: unusual table layouts, scanned PDFs, abbreviated date
 | --- | --- |
 | `app.py` | Flask routes: upload/paste form, review page, `.ics` download |
 | `parser.py` | Finds dates in syllabus text and classifies each event |
-| `pdf_text.py` | Extracts PDF text and joins wrapped weekly schedule cells |
+| `pdf_text.py` | Extracts PDF text and table rows, and identifies skipped image pages |
 | `calendar_maker.py` | Writes events to `.ics` format |
 | `templates/`, `static/` | HTML pages and styling |
 | `tests/` | Pytest suite covering the parser, calendar output, and web routes |
@@ -57,4 +61,4 @@ python -m pytest
 
 ## Built with
 
-Python, Flask, pypdf, icalendar, pytest. Deployed on Vercel.
+Python, Flask, pypdf, pdfplumber, icalendar, pytest. Deployed on Vercel.

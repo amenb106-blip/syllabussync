@@ -27,6 +27,10 @@
             <p class="summary-pill"><span id="date-count">0</span> dates found &middot; <span id="selected-count">0</span> selected</p>
         </div>
 
+        {% if pdf_warning %}
+        <p class="pdf-warning" role="alert">{{ pdf_warning }}</p>
+        {% endif %}
+
         <form method="POST" action="/download">
             <div class="event-groups">
                 {% for group in groups %}
@@ -46,7 +50,7 @@
                     <div class="event-table">
                         <div class="event-grid">
                             <div class="event-grid-header" aria-hidden="true">
-                                <span>Include</span><span>Event name</span><span>Date</span><span>Why it's here</span>
+                                <span>Include</span><span>Event name</span><span>Date</span><span>Time</span><span>Why it's here</span>
                             </div>
                             {% for event in group["items"] %}
                             <div class="event-row">
@@ -61,6 +65,9 @@
                                 </div>
                                 <div>
                                     <input type="date" name="event_date" value="{{ event.date.isoformat() }}" aria-label="Date for {{ event.name }}" required>
+                                </div>
+                                <div>
+                                    <input type="time" name="event_time" value="{{ event.time.isoformat('minutes') if event.time else '' }}" aria-label="Time for {{ event.name }}, leave blank for an all-day event">
                                 </div>
                                 <div class="reason">
                                     <span class="confidence confidence-{{ event.confidence }}">{{ event.confidence }} confidence</span>{{ event.reason }}

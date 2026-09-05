@@ -1,4 +1,5 @@
 import io
+from datetime import date, datetime
 from html.parser import HTMLParser
 
 import pytest
@@ -72,7 +73,7 @@ def test_generate_groups_candidates_and_only_selects_actionable_events(client):
 
 def test_pdf_extracted_text_remains_reviewable(client, monkeypatch):
     monkeypatch.setattr(
-        "app.read_pdf_text", lambda _file: "Quiz: October 12\nOffice hours: October 14"
+        "app.read_pdf_text", lambda _file, **_kwargs: "Quiz: October 12\nOffice hours: October 14"
     )
 
     response = client.post(
@@ -167,3 +168,71 @@ def test_download_matches_selection_when_categories_interleave(client):
     }
 
     assert summaries == {"Assignment", "Homework", "Quiz"}
+
+
+def test_review_page_offers_an_editable_time_for_each_event(client):
+    response = client.post(
+        "/generate",
+        data={
+            "syllabus": "Lab 1 due: October 12 at 11:59 PM\nMidterm: October 14",
+            "academic_start_year": "2026",
+        },
+    )
+
+    assert response.status_code == 200
+    times = [
+        field for field in InputParser(response.get_data(as_text=True)).inputs
+        if field.get("name") == "event_time"
+    ]
+    assert [field.get("value") for field in times] == ["23:59", ""]
+
+
+def test_download_emits_a_timed_event_and_keeps_untimed_ones_all_day(client):
+    response = client.post(
+        "/download",
+        data=MultiDict(
+            [
+                ("name", "Lab 1"), ("event_date", "2026-10-12"), ("event_time", "23:59"),
+                ("include", "0"),
+                ("name", "Midterm"), ("event_date", "2026-10-14"), ("event_time", ""),
+                ("include", "1"),
+            ]
+        ),
+    )
+
+    assert response.status_code == 200
+    body = response.data.decode()
+    assert "DTSTART:20261012T235900" in body
+    assert "DTSTART;VALUE=DATE:20261014" in body
+    assert "TZID" not in body
+
+    events = {
+        str(component["SUMMARY"]): component.decoded("DTSTART")
+        for component in Calendar.from_ical(response.data).walk("VEVENT")
+    }
+    assert events["Lab 1"] == datetime(2026, 10, 12, 23, 59)
+    assert events["Midterm"] == date(2026, 10, 14)
+
+
+def test_download_rejects_an_unreadable_time(client):
+    response = client.post(
+        "/download",
+        data=MultiDict(
+            [("name", "Lab 1"), ("event_date", "2026-10-12"), ("event_time", "half past nine"),
+             ("include", "0")]
+        ),
+    )
+
+    assert b"needs a valid time" in response.data
+
+
+def test_download_rejects_a_time_list_that_does_not_match_the_events(client):
+    response = client.post(
+        "/download",
+        data=MultiDict(
+            [("name", "Lab 1"), ("event_date", "2026-10-12"), ("event_time", "23:59"),
+             ("name", "Midterm"), ("event_date", "2026-10-14"), ("include", "0")]
+        ),
+    )
+
+    assert b"could not be read" in response.data

@@ -173,6 +173,7 @@ input[type="file"]::file-selector-button { margin-right: 10px; padding: 5px 9px;
 .subtitle { max-width: 670px; margin: 10px 0 0; color: var(--text-muted); line-height: 1.55; }
 .summary-pill { flex: 0 0 auto; margin-top: 3px; padding: 8px 12px; color: var(--accent-dark); background: var(--accent-soft); border-radius: 999px; font-size: 14px; font-weight: 600; white-space: nowrap; }
 .event-groups { display: grid; gap: 20px; }
+.pdf-warning { margin: 0 0 24px; padding: 16px 20px; color: #664400; background: #fff4d6; border: 1px solid #e6c779; border-radius: 10px; }
 .event-group { overflow: hidden; box-shadow: none; }
 .event-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 24px; border-bottom: 1px solid var(--border); }
 .event-group h2 { margin: 0; font-size: 17px; }
@@ -180,11 +181,11 @@ input[type="file"]::file-selector-button { margin-right: 10px; padding: 5px 9px;
 .select-group { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--text-muted); font-size: 14px; font-weight: 500; white-space: nowrap; }
 input[type="checkbox"] { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .event-table { overflow-x: auto; }
-.event-grid { min-width: 790px; }
-.event-grid-header, .event-row { display: grid; grid-template-columns: 56px minmax(220px, 1fr) 190px 300px; gap: 16px; align-items: center; padding: 12px 24px; }
+.event-grid { min-width: 900px; }
+.event-grid-header, .event-row { display: grid; grid-template-columns: 56px minmax(200px, 1fr) 170px 120px 280px; gap: 16px; align-items: center; padding: 12px 24px; }
 .event-grid-header { color: var(--text-muted); background: #f8fafd; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
 .event-row + .event-row { border-top: 1px solid var(--row-divider); }
-.event-row input[type="text"], .event-row input[type="date"] { padding: 8px 10px; border-radius: 8px; }
+.event-row input[type="text"], .event-row input[type="date"], .event-row input[type="time"] { padding: 8px 10px; border-radius: 8px; }
 .include-cell { display: flex; justify-content: center; }
 .reason { color: var(--text-muted); font-size: 13px; line-height: 1.4; }
 .confidence { display: inline-block; margin: 0 6px 3px 0; padding: 4px 7px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1; }
