@@ -6,7 +6,7 @@ from flask import Flask, request, render_template, send_file
 
 from parser import parse_syllabus
 from calendar_maker import make_calendar
-from pypdf import PdfReader
+from pdf_text import read_pdf_text
 
 app = Flask(__name__)
 
@@ -24,11 +24,6 @@ def get_academic_start_year():
     if not 2000 <= academic_start_year <= 2100:
         return None
     return academic_start_year
-
-
-def read_pdf_text(uploaded_file):
-    reader = PdfReader(uploaded_file)
-    return "\n".join(page.extract_text() or "" for page in reader.pages)
 
 
 def group_events(events):

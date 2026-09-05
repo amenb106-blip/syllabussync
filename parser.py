@@ -24,7 +24,10 @@ DATE_FORMATS = [
 SELECTED_RULES = [
     (
         "Assessments",
-        re.compile(r"\b(?:quiz|exam|midterm|final|test)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(?:quiz|exam|midterm|test|final(?!\s+(?:term\s+)?(?:project|report|presentation|paper)))\b",
+            re.IGNORECASE,
+        ),
         "high",
         "Assessment keyword found.",
     ),
@@ -89,14 +92,20 @@ GENERIC_NAME = re.compile(
     r"^(?:(?:week|module|unit)\s*\d+|date|tbd|schedule|calendar)$", re.IGNORECASE
 )
 TRAILING_CONNECTOR = re.compile(r"\b(?:by|due|on)\s*[-:\u2013\u2014]*\s*$", re.IGNORECASE)
+EXAM_HEADING = re.compile(r"^(?:midterm|final(?:\s+exam)?|exam|quiz)(?:\s+\d+)?\s*:?$", re.IGNORECASE)
+POLICY_EXAMPLE = re.compile(r"^(?:if\b|for example\b|e\.g\.|suppose\b|assuming\b)", re.IGNORECASE)
+WINDOW_START = re.compile(r"\b(?:between|from)\b", re.IGNORECASE)
+WINDOW_CONNECTOR = re.compile(r"^\s*(?:and|to|until|through|--?|\u2013|\u2014)\s*", re.IGNORECASE)
+TIME_PREFIX = re.compile(r"^\s*(?:\d{1,2}(?::\d{2})?\s*(?:AM|PM)?\s*)?$", re.IGNORECASE)
 
 
 def _find_date(line, academic_start_year):
-    for pattern, separator, date_format in DATE_FORMATS:
-        match = pattern.search(line)
-        if not match:
-            continue
-
+    matches = [
+        (match, separator, date_format)
+        for pattern, separator, date_format in DATE_FORMATS
+        if (match := pattern.search(line)) is not None
+    ]
+    for match, separator, date_format in sorted(matches, key=lambda item: item[0].start()):
         month, day, explicit_year = match.groups()
         try:
             if explicit_year is not None:
@@ -124,6 +133,11 @@ def _event_name(line, date_match):
 
 
 def _classify(line):
+    if POLICY_EXAMPLE.search(line):
+        return (
+            "Policy and administration", "low", False,
+            "Conditional or example date; check whether this is an actual deadline.",
+        )
     for category, pattern, confidence, reason in SELECTED_RULES:
         if pattern.search(line):
             return category, confidence, True, reason
@@ -140,9 +154,46 @@ def _classify(line):
     )
 
 
+def _event_lines(text, academic_start_year):
+    lines = [" ".join(line.split()) for line in text.splitlines()]
+    heading = None
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        index += 1
+        if not line:
+            continue
+        if EXAM_HEADING.fullmatch(line):
+            heading = line.rstrip(":")
+            continue
+        if line.lower() in {"for example:", "for example", "suppose:"} and index < len(lines):
+            line += " " + lines[index]
+            index += 1
+        parsed_date, date_match = _find_date(line, academic_start_year)
+        if parsed_date is not None:
+            if WINDOW_START.search(line) and re.search(r"(?:and|to|until|through|--?|\u2013|\u2014)$", line, re.IGNORECASE):
+                if index < len(lines):
+                    next_date, next_match = _find_date(lines[index], academic_start_year)
+                    if next_date is not None and TIME_PREFIX.fullmatch(lines[index][:next_match.start()]):
+                        line += " " + lines[index]
+                        index += 1
+            date_match = _find_date(line, academic_start_year)[1]
+            if heading and (
+                re.match(r"^Section\s+\S+:", line, re.IGNORECASE)
+                or _event_name(line, date_match) is None
+            ):
+                line = f"{heading}: {line}"
+            else:
+                heading = None
+            yield line
+        else:
+            heading = None
+
+
 def parse_syllabus(text, academic_start_year):
     events = []
-    for line in text.splitlines():
+    seen = set()
+    for line in _event_lines(text, academic_start_year):
         date, date_match = _find_date(line, academic_start_year)
         if date is None:
             continue
@@ -152,6 +203,30 @@ def parse_syllabus(text, academic_start_year):
             continue
 
         category, confidence, default_selected, reason = _classify(line)
+        remaining = line[date_match.end():]
+        if category == "Assessments" and WINDOW_START.search(line[:date_match.start()]):
+            connector = WINDOW_CONNECTOR.match(remaining)
+            if connector:
+                window_end = remaining[connector.end():]
+                end_date, end_match = _find_date(window_end, academic_start_year)
+                if end_date is not None and TIME_PREFIX.fullmatch(window_end[:end_match.start()]):
+                    if end_match.group(3) is None:
+                        try:
+                            end_date = end_date.replace(year=date.year + (end_date.month < date.month))
+                        except ValueError:
+                            end_date = None
+                    if end_date is not None and end_date >= date:
+                        section = re.search(r"\bSection\s+[^:]+", line, re.IGNORECASE)
+                        label = line.split(":", 1)[0] if section else line[:WINDOW_START.search(line).start()].rstrip(" :-")
+                        if section and section.group() != label:
+                            label += " - " + section.group()
+                        name = f"{label} (exam window: {date.isoformat()} to {end_date.isoformat()})"
+                        date = end_date
+                        reason = "Exam window; calendar marks the closing day. Check the syllabus for exact times."
+        identity = (name.casefold(), date)
+        if identity in seen:
+            continue
+        seen.add(identity)
         events.append(
             {
                 "name": name,
