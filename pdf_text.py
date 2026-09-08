@@ -4,7 +4,22 @@ from io import BytesIO
 import pdfplumber
 from pypdf import PdfReader
 
-from parser import DATE_PATTERNS
+_ORDINAL_DAY = r"(\d{1,2})(?:st|nd|rd|th)?\b"
+_TRAILING_YEAR = r"(?:,?\s*(\d{4})\b)?"
+_FULL_MONTH = re.compile(
+    r"\b(January|February|March|April|May|June|July|August|"
+    r"September|October|November|December)\s+" + _ORDINAL_DAY + _TRAILING_YEAR,
+    re.IGNORECASE,
+)
+_ABBREV_MONTH = re.compile(
+    r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept|Sep|Oct|Nov|Dec)\.?\s+"
+    + _ORDINAL_DAY + _TRAILING_YEAR,
+    re.IGNORECASE,
+)
+_NUMERIC = re.compile(r"\b(\d{1,2})/(\d{1,2})\b(?:/(\d{2,4})\b)?(?!/\d)")
+_DASHED = re.compile(r"(?<![-\w])(\d{1,2})-(\d{1,2})-(\d{2,4})(?![-\w])")
+
+DATE_PATTERNS = [_FULL_MONTH, _ABBREV_MONTH, _NUMERIC, _DASHED]
 
 TOPIC_HEADING = re.compile(
     r"\b(?:topic|event|description|lecture|subject|activit)", re.IGNORECASE
@@ -102,10 +117,9 @@ def read_pdf_text(uploaded_file, *, skipped_pages=None):
     with pdfplumber.open(BytesIO(data)) as document:
         for index, page in enumerate(reader.pages, start=1):
             table_page = document.pages[index - 1] if index <= len(document.pages) else None
-            text = (
-                page.extract_text(extraction_mode="layout", layout_mode_space_vertically=False) or ""
-                if "/Contents" in page else ""
-            )
+            text = table_page.extract_text(layout=True, x_density=3) or "" if table_page else ""
+            if not text.strip() and "/Contents" in page:
+                text = page.extract_text(extraction_mode="layout", layout_mode_space_vertically=False) or ""
             if table_page is not None and skipped_pages is not None and _looks_scanned(table_page, text):
                 skipped_pages.append(index)
             if text.strip() and table_page is not None:
@@ -129,9 +143,11 @@ def _join_weekly_cells(pages):
 
     for text in pages:
         for line in text.splitlines():
-            if re.match(r"^\s*Week\s{2,}", line, re.IGNORECASE):
+            weekly_heading = re.match(r"^\s*Week(\s{2,})(?=\S)", line, re.IGNORECASE)
+            if weekly_heading:
                 flush()
-                columns = [match.start() for match in re.finditer(r"\S.*?(?=\s{2,}|$)", line)]
+                gap = len(weekly_heading.group(1))
+                columns = [match.start() for match in re.finditer(r"\S.*?(?=\s{" + str(gap) + r",}|$)", line)]
                 if len(columns) < 2:
                     columns = None
                 continue

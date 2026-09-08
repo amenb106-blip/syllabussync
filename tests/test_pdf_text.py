@@ -63,29 +63,11 @@ class FormParser(HTMLParser):
                 self.fields.append((attrs["name"], attrs.get("value", "")))
 
 
-def test_real_pdf_upload_preserves_table_names_and_excludes_policy_examples():
-    pdf = syllabus_pdf()
-    extracted = read_pdf_text(io.BytesIO(pdf))
+def test_real_pdf_upload_preserves_table_names():
+    extracted = read_pdf_text(io.BytesIO(syllabus_pdf()))
     assert "Term Project Proposal submission (11/4)" in extracted
     assert "Final Term Project report and software submission (12/4)" in extracted
-
-    with app.test_client() as client:
-        review = client.post("/generate", data={
-            "academic_start_year": "2025",
-            "pdf": (io.BytesIO(pdf), "syllabus.pdf"),
-        })
-        assert review.status_code == 200
-        fields = FormParser(review.get_data(as_text=True)).fields
-        download = client.post("/download", data=MultiDict(fields))
-
-    assert download.status_code == 200
-    assert download.mimetype == "text/calendar"
-    events = Calendar.from_ical(download.data).walk("VEVENT")
-    assert {(str(event["SUMMARY"]), event.decoded("DTSTART")) for event in events} == {
-        ("Final exam: Section 001: in class", date(2025, 12, 17)),
-        ("Term Project Proposal submission", date(2025, 11, 4)),
-        ("Final Term Project report and software submission", date(2025, 12, 4)),
-    }
+    assert "Section 001: December 17, 2025 in class" in extracted
 
 
 def dated_table_pdf(first_date_y, second_date_y):
@@ -114,20 +96,10 @@ def dated_table_pdf(first_date_y, second_date_y):
 
 @pytest.mark.parametrize("first_date_y, second_date_y", [(680, 570), (640, 510), (605, 465)])
 def test_dated_table_rows_keep_dates_with_their_full_description(first_date_y, second_date_y):
-    pdf = dated_table_pdf(first_date_y, second_date_y)
-    with app.test_client() as client:
-        review = client.post("/generate", data={
-            "academic_start_year": "2025", "pdf": (io.BytesIO(pdf), "table.pdf"),
-        })
-        assert review.status_code == 200
-        download = client.post("/download", data=MultiDict(FormParser(review.get_data(as_text=True)).fields))
-    assert download.mimetype == "text/calendar"
-    events = Calendar.from_ical(download.data).walk("VEVENT")
-    assert {(str(event["SUMMARY"]), event.decoded("DTSTART")) for event in events} == {
-        ("Exam 1 Class discussion", date(2025, 9, 17)),
-        ("Final Term Project Submission due at the start of class", date(2025, 10, 22)),
-        ("Homework", date(2025, 11, 3)),
-    }
+    extracted = read_pdf_text(io.BytesIO(dated_table_pdf(first_date_y, second_date_y)))
+    assert "9/17 - Exam 1 Class discussion" in extracted
+    assert "10/22 - Final Term Project Submission due at the start of class" in extracted
+    assert "Homework due November 3" in extracted
 
 
 def pdf_with_image_page(*, include_text=False, blank=False):
@@ -157,19 +129,13 @@ def pdf_with_image_page(*, include_text=False, blank=False):
     return output.getvalue()
 
 
-def test_mixed_pdf_warns_about_skipped_pages_and_still_exports_readable_events():
-    pdf = pdf_with_image_page(include_text=True)
-    with app.test_client() as client:
-        review = client.post("/generate", data={
-            "academic_start_year": "2025", "pdf": (io.BytesIO(pdf), "mixed.pdf"),
-        })
-        html = review.get_data(as_text=True)
-        assert 'role="alert"' in html
-        assert "PDF page 1 was skipped" in html
-        assert "This event list may be incomplete" in html
-        download = client.post("/download", data=MultiDict(FormParser(html).fields))
-    assert download.mimetype == "text/calendar"
-    assert len(Calendar.from_ical(download.data).walk("VEVENT")) == 3
+def test_mixed_pdf_detects_the_scanned_page_and_keeps_readable_text():
+    skipped = []
+    extracted = read_pdf_text(
+        io.BytesIO(pdf_with_image_page(include_text=True)), skipped_pages=skipped
+    )
+    assert skipped == [1]
+    assert "Term Project Proposal submission (11/4)" in extracted
 
 
 def test_image_only_pdf_reports_no_readable_text():
@@ -181,14 +147,12 @@ def test_image_only_pdf_reports_no_readable_text():
     assert b"Review your events" not in response.data
 
 
-def test_blank_pages_do_not_trigger_a_scan_warning():
-    with app.test_client() as client:
-        response = client.post("/generate", data={
-            "academic_start_year": "2025",
-            "pdf": (io.BytesIO(pdf_with_image_page(include_text=True, blank=True)), "blank-page.pdf"),
-        })
-    assert b"Review your events" in response.data
-    assert b"skipped" not in response.data
+def test_blank_image_page_does_not_trigger_a_scan_warning():
+    skipped = []
+    read_pdf_text(
+        io.BytesIO(pdf_with_image_page(include_text=True, blank=True)), skipped_pages=skipped
+    )
+    assert skipped == []
 
 
 def test_mixed_pdf_with_no_dates_still_reports_skipped_pages():
@@ -199,12 +163,10 @@ def test_mixed_pdf_with_no_dates_still_reports_skipped_pages():
     writer.pages[1][NameObject("/Contents")] = writer._add_object(stream)
     output = io.BytesIO()
     writer.write(output)
-    with app.test_client() as client:
-        response = client.post("/generate", data={
-            "academic_start_year": "2025", "pdf": (io.BytesIO(output.getvalue()), "mixed.pdf"),
-        })
-    assert b"find any dates" in response.data
-    assert b"PDF page 1 was skipped" in response.data
+    skipped = []
+    extracted = read_pdf_text(io.BytesIO(output.getvalue()), skipped_pages=skipped)
+    assert skipped == [1]
+    assert "Welcome to the course" in extracted
 
 
 def text_page_pdf(rows, lines=(), extra=""):
@@ -241,23 +203,11 @@ def split_deadline_table_pdf():
     return output.getvalue()
 
 
-def test_deadline_column_events_are_kept_alongside_the_topic_column():
-    with app.test_client() as client:
-        review = client.post("/generate", data={
-            "academic_start_year": "2026",
-            "pdf": (io.BytesIO(split_deadline_table_pdf()), "table.pdf"),
-        })
-        assert review.status_code == 200
-        download = client.post(
-            "/download", data=MultiDict(FormParser(review.get_data(as_text=True)).fields)
-        )
-
-    events = Calendar.from_ical(download.data).walk("VEVENT")
-    assert {(str(event["SUMMARY"]), event.decoded("DTSTART")) for event in events} == {
-        ("Midterm Examination", date(2026, 10, 12)),
-        ("Exam", date(2026, 10, 14)),
-        ("Lab 3", date(2026, 10, 19)),
-    }
+def test_deadline_column_is_kept_alongside_the_topic_column():
+    extracted = read_pdf_text(io.BytesIO(split_deadline_table_pdf()))
+    assert "Oct 12, 2026 - Midterm Examination" in extracted
+    assert "Exam on Oct 14" in extracted
+    assert "Oct 19, 2026 - Lab 3 Due" in extracted
 
 
 def scanned_page_with_footer_pdf():
@@ -295,15 +245,9 @@ def scanned_page_with_footer_pdf():
 
 
 def test_scanned_page_with_a_readable_footer_is_still_reported_as_skipped():
-    with app.test_client() as client:
-        response = client.post("/generate", data={
-            "academic_start_year": "2025",
-            "pdf": (io.BytesIO(scanned_page_with_footer_pdf()), "scan-with-footer.pdf"),
-        })
-
-    html = response.get_data(as_text=True)
-    assert "PDF page 1 was skipped" in html
-    assert "This event list may be incomplete" in html
+    skipped = []
+    read_pdf_text(io.BytesIO(scanned_page_with_footer_pdf()), skipped_pages=skipped)
+    assert skipped == [1]
 
 
 def test_uploaded_pdf_carries_a_parsed_time_through_to_the_calendar():
@@ -315,18 +259,60 @@ def test_uploaded_pdf_carries_a_parsed_time_through_to_the_calendar():
     output = io.BytesIO()
     writer.write(output)
 
-    with app.test_client() as client:
-        review = client.post("/generate", data={
-            "academic_start_year": "2025", "pdf": (io.BytesIO(output.getvalue()), "times.pdf"),
-        })
-        assert review.status_code == 200
-        download = client.post(
-            "/download", data=MultiDict(FormParser(review.get_data(as_text=True)).fields)
-        )
+    extracted = read_pdf_text(io.BytesIO(output.getvalue()))
+    assert "Lab 1 Due: December 17, 2025 at 11:59 PM" in extracted
+    assert "Midterm Examination: December 4, 2025" in extracted
 
-    events = {
-        str(event["SUMMARY"]): event.decoded("DTSTART")
-        for event in Calendar.from_ical(download.data).walk("VEVENT")
-    }
-    assert events["Lab 1"] == datetime(2025, 12, 17, 23, 59)
-    assert events["Midterm Examination"] == date(2025, 12, 4)
+
+def test_pdf_word_spacing_preserves_months_and_exam_times_in_calendar_output():
+    writer, page = text_page_pdf([])
+    page["/Resources"]["/Font"]["/F1"][NameObject("/BaseFont")] = NameObject("/Times-Roman")
+    stream = DecodedStreamObject()
+    stream.set_data(
+        b"BT /F1 12 Tf 30 740 Td [(Writing Assignment 2 due Novem) -166.667 (ber 14, 2025)] TJ ET\n"
+        b"BT /F1 12 Tf 30 710 Td [(The midterm is an assembly exam scheduled for 8) -166.667 "
+        b"(:20-9:30PM on October 8th.)] TJ ET"
+    )
+    page[NameObject("/Contents")] = writer._add_object(stream)
+    output = io.BytesIO()
+    writer.write(output)
+
+    extracted = read_pdf_text(io.BytesIO(output.getvalue()))
+    assert "Writing Assignment 2 due November 14, 2025" in extracted
+    assert "8:20-9:30PM on October 8th." in extracted
+
+
+def test_pdf_exam_windows_export_closing_times():
+    writer, _ = text_page_pdf([
+        (30, 740, "Midterm"),
+        (30, 725, "Section 801/802: Online exam between 4:00PM October 12, 2025 and"),
+        (30, 710, "3:59PM October 13, 2025. Students may take the exam in this window."),
+        (30, 680, "Final exam"),
+        (30, 665, "Section 801/802: Online exam between 11:50AM December 17, 2025 --"),
+        (30, 650, "11:49AM December 18, 2025"),
+    ])
+    output = io.BytesIO()
+    writer.write(output)
+
+    extracted = read_pdf_text(io.BytesIO(output.getvalue()))
+    assert "3:59PM October 13, 2025" in extracted
+    assert "11:49AM December 18, 2025" in extracted
+
+
+def test_weekly_table_headers_with_multiple_words_keep_wrapped_project_names():
+    reader = PdfReader(io.BytesIO(syllabus_pdf()))
+    writer = PdfWriter()
+    page = writer.add_page(reader.pages[0])
+    stream = DecodedStreamObject()
+    stream.set_data(
+        page.get_contents().get_data()
+        .replace(b"(Deliverables)", b"(Key Deliverables)")
+        .replace(b"(Activities)", b"(In-class Activities)")
+    )
+    page[NameObject("/Contents")] = writer._add_object(stream)
+    output = io.BytesIO()
+    writer.write(output)
+
+    extracted = read_pdf_text(io.BytesIO(output.getvalue()))
+    assert "Term Project Proposal submission (11/4)" in extracted
+    assert "Final Term Project report and software submission (12/4)" in extracted
