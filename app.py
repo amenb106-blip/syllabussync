@@ -4,7 +4,7 @@ from datetime import date, time
 
 from flask import Flask, request, render_template, send_file
 
-from parser import parse_syllabus
+from extractor import extract_events
 from calendar_maker import make_calendar
 from pdf_text import read_pdf_text
 
@@ -103,7 +103,7 @@ def generate():
             "into the box, or upload a PDF."
         )
 
-    events = parse_syllabus(syllabus_text, academic_start_year)
+    events = extract_events(syllabus_text, academic_start_year)
     if not events:
         return message_page(
             "We couldn't find any dates in that syllabus. We understand "

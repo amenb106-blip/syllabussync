@@ -1,11 +1,12 @@
 import io
-from datetime import date, datetime
+from datetime import date, datetime, time
 from html.parser import HTMLParser
 
 import pytest
 from icalendar import Calendar
 from werkzeug.datastructures import MultiDict
 
+import app as app_module
 from app import app
 
 
@@ -27,6 +28,22 @@ def client():
         yield test_client
 
 
+def _event(name, event_date, category, default_selected, event_time=None):
+    return {
+        "name": name,
+        "date": event_date,
+        "time": event_time,
+        "category": category,
+        "confidence": "high" if default_selected else "low",
+        "default_selected": default_selected,
+        "reason": category + " event",
+    }
+
+
+def _use_events(monkeypatch, events):
+    monkeypatch.setattr(app_module, "extract_events", lambda text, year: events)
+
+
 def test_home_shows_academic_year_input(client):
     response = client.get("/")
 
@@ -34,13 +51,15 @@ def test_home_shows_academic_year_input(client):
     assert b"academic_start_year" in response.data
 
 
-def test_generate_shows_review_page_and_rolls_spring_dates_forward(client):
+def test_generate_renders_extracted_events(client, monkeypatch):
+    _use_events(monkeypatch, [
+        _event("Midterm", date(2026, 10, 12), "Assessments", True),
+        _event("Final", date(2027, 5, 10), "Assessments", True),
+    ])
+
     response = client.post(
         "/generate",
-        data={
-            "syllabus": "Midterm: October 12\nFinal: May 10",
-            "academic_start_year": "2026",
-        },
+        data={"syllabus": "whatever", "academic_start_year": "2026"},
     )
 
     assert response.status_code == 200
@@ -49,19 +68,20 @@ def test_generate_shows_review_page_and_rolls_spring_dates_forward(client):
     assert b"2027-05-10" in response.data
 
 
-def test_generate_groups_candidates_and_only_selects_actionable_events(client):
+def test_generate_groups_events_and_selects_only_actionable_ones(client, monkeypatch):
+    _use_events(monkeypatch, [
+        _event("Assignment", date(2026, 10, 12), "Deadlines", True),
+        _event("Read Chapter 3", date(2026, 10, 14), "Readings", False),
+    ])
+
     response = client.post(
         "/generate",
-        data={
-            "syllabus": "Assignment due: October 12\nRead Chapter 3: October 14",
-            "academic_start_year": "2026",
-        },
+        data={"syllabus": "whatever", "academic_start_year": "2026"},
     )
 
     assert response.status_code == 200
     assert b"Deadlines" in response.data
     assert b"Readings" in response.data
-    assert b"Deadline keyword found." in response.data
     checkboxes = [
         field for field in InputParser(response.get_data(as_text=True)).inputs
         if field.get("name") == "include"
@@ -71,10 +91,12 @@ def test_generate_groups_candidates_and_only_selects_actionable_events(client):
     ]
 
 
-def test_pdf_extracted_text_remains_reviewable(client, monkeypatch):
-    monkeypatch.setattr(
-        "app.read_pdf_text", lambda _file, **_kwargs: "Quiz: October 12\nOffice hours: October 14"
-    )
+def test_pdf_text_flows_into_review(client, monkeypatch):
+    monkeypatch.setattr("app.read_pdf_text", lambda _file, **_kwargs: "extracted text")
+    _use_events(monkeypatch, [
+        _event("Quiz", date(2026, 10, 12), "Assessments", True),
+        _event("Office hours", date(2026, 10, 14), "Office hours", False),
+    ])
 
     response = client.post(
         "/generate",
@@ -139,15 +161,20 @@ def test_download_uses_edited_events_and_ignores_unchecked_ones(client):
     assert str(events[0]["SUMMARY"]) == "Updated Midterm"
     assert events[0].decoded("DTSTART").isoformat() == "2026-10-15"
 
-def test_download_matches_selection_when_categories_interleave(client):
-    syllabus = "Assignment due: Oct 12\nRead ch 3: Oct 13\nQuiz: Oct 14\nHomework due: Oct 15"
+
+def test_download_matches_selection_when_categories_interleave(client, monkeypatch):
+    _use_events(monkeypatch, [
+        _event("Assignment", date(2026, 10, 12), "Deadlines", True),
+        _event("Read ch 3", date(2026, 10, 13), "Readings", False),
+        _event("Quiz", date(2026, 10, 14), "Assessments", True),
+        _event("Homework", date(2026, 10, 15), "Deadlines", True),
+    ])
 
     response = client.post(
         "/generate",
-        data={"syllabus": syllabus, "academic_start_year": "2026"},
+        data={"syllabus": "whatever", "academic_start_year": "2026"},
     )
     assert response.status_code == 200
-
 
     form = [
         (field["name"], field.get("value", ""))
@@ -170,13 +197,15 @@ def test_download_matches_selection_when_categories_interleave(client):
     assert summaries == {"Assignment", "Homework", "Quiz"}
 
 
-def test_review_page_offers_an_editable_time_for_each_event(client):
+def test_review_page_offers_an_editable_time_for_each_event(client, monkeypatch):
+    _use_events(monkeypatch, [
+        _event("Lab 1", date(2026, 10, 12), "Deadlines", True, event_time=time(23, 59)),
+        _event("Midterm", date(2026, 10, 14), "Assessments", True),
+    ])
+
     response = client.post(
         "/generate",
-        data={
-            "syllabus": "Lab 1 due: October 12 at 11:59 PM\nMidterm: October 14",
-            "academic_start_year": "2026",
-        },
+        data={"syllabus": "whatever", "academic_start_year": "2026"},
     )
 
     assert response.status_code == 200
