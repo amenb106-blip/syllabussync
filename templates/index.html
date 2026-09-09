@@ -38,7 +38,7 @@
                 <button class="tab" id="upload-tab" type="button" role="tab" aria-selected="false" aria-controls="upload-panel">Upload PDF</button>
             </div>
 
-            <form method="POST" action="/generate" enctype="multipart/form-data">
+            <form id="syllabus-form" method="POST" action="/generate" enctype="multipart/form-data">
                 <div class="field" id="paste-panel" role="tabpanel" aria-labelledby="paste-tab">
                     <label for="syllabus">Syllabus text</label>
                     <textarea id="syllabus" name="syllabus" placeholder="Week 5 — Midterm Exam: October 14&#10;Project 1 due Sep 25&#10;Final Exam 12/16"></textarea>
@@ -55,16 +55,23 @@
                     <p class="hint">Aug&ndash;Dec dates use this year; Jan&ndash;Jul use the next.</p>
                 </div>
 
-                <button class="button button-full" type="submit">
+                <button class="button button-full" id="find-events" type="submit" aria-busy="false">
                     <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg>
-                    Find events
+                    <span class="button-spinner" aria-hidden="true"></span>
+                    <span class="button-label">Find events</span>
                 </button>
-                <p class="form-caption">You'll review everything before anything is created.</p>
+                <p class="form-caption" id="processing-status" role="status" aria-live="polite" aria-atomic="true">You'll review everything before anything is created.</p>
             </form>
         </section>
     </main>
 
     <script>
+        const form = document.querySelector("#syllabus-form");
+        const submitButton = document.querySelector("#find-events");
+        const buttonLabel = submitButton.querySelector(".button-label");
+        const status = document.querySelector("#processing-status");
+        const initialStatus = status.textContent;
+        let isSubmitting = false;
         const tabs = document.querySelectorAll(".tab");
         const panels = {
             "paste-tab": document.querySelector("#paste-panel"),
@@ -81,6 +88,25 @@
                 else document.querySelector("#syllabus").value = "";
             });
         });
+
+        function setSubmitting(submitting) {
+            isSubmitting = submitting;
+            submitButton.disabled = submitting;
+            submitButton.setAttribute("aria-busy", String(submitting));
+            buttonLabel.textContent = submitting ? "Finding your deadlines…" : "Find events";
+            status.textContent = submitting ? "Reading your syllabus. This may take a moment." : initialStatus;
+            tabs.forEach((tab) => { tab.disabled = submitting; });
+        }
+
+        form.addEventListener("submit", (event) => {
+            if (isSubmitting) {
+                event.preventDefault();
+                return;
+            }
+            setSubmitting(true);
+        });
+
+        window.addEventListener("pageshow", () => { setSubmitting(false); });
     </script>
 </body>
 </html>
