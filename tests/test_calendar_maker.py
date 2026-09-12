@@ -45,3 +45,17 @@ def test_event_ids_are_stable_across_exports_and_independent_of_selection_order(
     assert len(set(original_ids)) == 3
     assert [str(event["UID"]) for event in reordered] == list(reversed(original_ids))
     assert str(selected[0]["UID"]) == original_ids[0]
+
+
+def test_reminders_preserve_timed_and_all_day_start_values():
+    from datetime import time
+    events = [
+        {'name': 'Quiz', 'date': date(2026, 12, 31), 'time': time(23, 30)},
+        {'name': 'Paper', 'date': date(2027, 1, 1)},
+    ]
+    calendar = Calendar.from_ical(make_calendar(events, reminder_minutes=60))
+    items = calendar.walk('VEVENT')
+    assert items[0].decoded('DTSTART') == datetime(2026, 12, 31, 23, 30)
+    assert items[1].decoded('DTSTART') == date(2027, 1, 1)
+    assert len(calendar.walk('VALARM')) == 2
+    assert all(alarm.decoded('TRIGGER') == -timedelta(hours=1) for alarm in calendar.walk('VALARM'))

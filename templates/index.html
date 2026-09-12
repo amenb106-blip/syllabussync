@@ -3,110 +3,159 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>SyllabusSync</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&display=swap">
+    <meta name="description" content="Extract syllabus dates, review events, and download a calendar file.">
+    <title>SyllabusSync | Syllabus to calendar</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=asset_version('style.css')) }}">
+    <script src="{{ url_for('static', filename='dashboard.js', v=asset_version('dashboard.js')) }}" defer></script>
+    <noscript><style>#paste-panel[hidden] { display: block !important; margin-top: 20px; } .tab-list { display: none; }</style></noscript>
 </head>
 <body>
-    <header class="site-header">
-        <a class="brand" href="/" aria-label="SyllabusSync home">
-            <span class="brand-mark" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M7 3v4M17 3v4M3 10h18M8 15l2.5 2.5L16 12"></path></svg>
-            </span>
-            <span>SyllabusSync</span>
-        </a>
-    </header>
+    <a class="skip-link" href="#workspace">Skip to workspace</a>
+    <div class="dashboard">
+        <aside class="rail" aria-label="Workflow status">
+            <a class="brand" href="/" aria-label="SyllabusSync home">
+                <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M8 15l2.5 2.5L16 12"/></svg>
+                <span>SyllabusSync</span>
+            </a>
 
-    <main class="home-layout">
-        <section class="pitch" aria-labelledby="page-title">
-            <h1 class="display-title" id="page-title">Every deadline, straight to your calendar.</h1>
-            <p class="lead">Paste a syllabus or upload the PDF. SyllabusSync finds the exams, projects, and due dates &mdash; you approve them, your calendar remembers them.</p>
-            <ol class="steps">
-                <li><span class="step-number">1</span><span>Add your syllabus</span></li>
-                <li><span class="step-number">2</span><span>Review the dates it found</span></li>
-                <li><span class="step-number">3</span><span>Download one file for your whole term</span></li>
-            </ol>
-            <p class="compatibility">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M7 3v4M17 3v4M3 10h18"></path></svg>
-                Works with Google Calendar, Apple Calendar, and Outlook.
-            </p>
-        </section>
-
-        <section class="form-card" aria-label="Add your syllabus">
-            <div class="tab-list" role="tablist" aria-label="Syllabus format">
-                <button class="tab" id="paste-tab" type="button" role="tab" aria-selected="true" aria-controls="paste-panel">Paste text</button>
-                <button class="tab" id="upload-tab" type="button" role="tab" aria-selected="false" aria-controls="upload-panel">Upload PDF</button>
+            <div class="rail-workflow">
+                <p class="eyebrow">WORKSPACE</p>
+                <ol class="workflow">
+                    <li id="stage-upload" aria-current="step"><span class="stage-number">01</span> Upload syllabi <span class="stage-dot" aria-hidden="true"></span></li>
+                    <li id="stage-review"><span class="stage-number">02</span> Review events <span class="stage-dot" aria-hidden="true"></span></li>
+                    <li id="stage-export"><span class="stage-number">03</span> Export calendar <span class="stage-dot" aria-hidden="true"></span></li>
+                </ol>
             </div>
 
-            <form id="syllabus-form" method="POST" action="/generate" enctype="multipart/form-data">
-                <div class="field" id="paste-panel" role="tabpanel" aria-labelledby="paste-tab">
-                    <label for="syllabus">Syllabus text</label>
-                    <textarea id="syllabus" name="syllabus" placeholder="Week 5 — Midterm Exam: October 14&#10;Project 1 due Sep 25&#10;Final Exam 12/16"></textarea>
-                </div>
+            <div class="rail-summary">
+                <p class="eyebrow">THIS SESSION</p>
+                <dl>
+                    <div><dt>Processed</dt><dd id="rail-files">0 files</dd></div>
+                    <div><dt>Events</dt><dd id="rail-events">0</dd></div>
+                    <div><dt>Selected</dt><dd id="rail-selected">0</dd></div>
+                </dl>
+            </div>
 
-                <div class="field" id="upload-panel" role="tabpanel" aria-labelledby="upload-tab" hidden>
-                    <label for="pdf">Upload a PDF</label>
-                    <input type="file" id="pdf" name="pdf" accept=".pdf">
-                </div>
+            <p class="privacy">No account required. Files are not saved by SyllabusSync. Extracted text is processed with Google Gemini.</p>
+        </aside>
 
-                <div class="field">
-                    <label for="academic_start_year">Academic year starts in</label>
-                    <input class="year-field" type="number" id="academic_start_year" name="academic_start_year" value="{{ current_year }}" min="2000" max="2100" required>
-                    <p class="hint">Aug&ndash;Dec dates use this year; Jan&ndash;Jul use the next.</p>
-                </div>
+        <main class="workspace" id="workspace">
+            <header class="workspace-header">
+                <span>Syllabus to calendar</span>
+                <span class="session-label"><span aria-hidden="true"></span> Current session</span>
+            </header>
 
-                <button class="button button-full" id="find-events" type="submit" aria-busy="false">
-                    <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg>
-                    <span class="button-spinner" aria-hidden="true"></span>
-                    <span class="button-label">Find events</span>
-                </button>
-                <p class="form-caption" id="processing-status" role="status" aria-live="polite" aria-atomic="true">You'll review everything before anything is created.</p>
-            </form>
-        </section>
-    </main>
+            <div class="workspace-content">
+                <section aria-labelledby="page-title">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">01 / DOCUMENTS</p>
+                            <h1 id="page-title">Upload syllabi</h1>
+                            <p class="subtitle">Extract dates. Review the schedule. Export your calendar.</p>
+                        </div>
+                        <span class="format-label">PDF &rarr; ICS</span>
+                    </div>
 
-    <script>
-        const form = document.querySelector("#syllabus-form");
-        const submitButton = document.querySelector("#find-events");
-        const buttonLabel = submitButton.querySelector(".button-label");
-        const status = document.querySelector("#processing-status");
-        const initialStatus = status.textContent;
-        let isSubmitting = false;
-        const tabs = document.querySelectorAll(".tab");
-        const panels = {
-            "paste-tab": document.querySelector("#paste-panel"),
-            "upload-tab": document.querySelector("#upload-panel")
-        };
+                    <form id="syllabus-form" method="POST" action="/generate" enctype="multipart/form-data" class="upload-card">
+                        <div class="input-toolbar">
+                            <div class="tab-list" role="tablist" aria-label="Syllabus format">
+                                <button type="button" class="tab" id="upload-tab" role="tab" aria-selected="true" aria-controls="upload-panel">PDF upload</button>
+                                <button type="button" class="tab" id="paste-tab" role="tab" aria-selected="false" aria-controls="paste-panel" tabindex="-1">Paste text</button>
+                            </div>
+                            <div class="year-control">
+                                <label for="academic_start_year">Academic start year</label>
+                                <input id="academic_start_year" name="academic_start_year" type="number" value="{{ current_year }}" min="2000" max="2100" required aria-describedby="year-hint">
+                            </div>
+                        </div>
 
-        tabs.forEach((tab) => {
-            tab.addEventListener("click", () => {
-                const isPaste = tab.id === "paste-tab";
-                tabs.forEach((item) => item.setAttribute("aria-selected", item === tab));
-                panels["paste-tab"].hidden = !isPaste;
-                panels["upload-tab"].hidden = isPaste;
-                if (isPaste) document.querySelector("#pdf").value = "";
-                else document.querySelector("#syllabus").value = "";
-            });
-        });
+                        <div id="upload-panel" role="tabpanel" aria-labelledby="upload-tab">
+                            <div class="drop-zone" id="drop-zone">
+                                <svg class="upload-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M12 18v-7m-3 3 3-3 3 3"/></svg>
+                                <h2>Drop your PDFs here</h2>
+                                <p>One syllabus or several, in a single session.</p>
+                                <label class="button file-button" for="pdf">Choose PDFs<input id="pdf" name="pdf" type="file" accept=".pdf,application/pdf" multiple></label>
+                                <span class="drop-hint">PDFs with selectable text</span>
+                            </div>
+                        </div>
 
-        function setSubmitting(submitting) {
-            isSubmitting = submitting;
-            submitButton.disabled = submitting;
-            submitButton.setAttribute("aria-busy", String(submitting));
-            buttonLabel.textContent = submitting ? "Finding your deadlines…" : "Find events";
-            status.textContent = submitting ? "Reading your syllabus. This may take a moment." : initialStatus;
-            tabs.forEach((tab) => { tab.disabled = submitting; });
-        }
+                        <div id="paste-panel" role="tabpanel" aria-labelledby="paste-tab" hidden>
+                            <label for="syllabus">Syllabus text</label>
+                            <textarea id="syllabus" name="syllabus" placeholder="Paste your syllabus here"></textarea>
+                        </div>
 
-        form.addEventListener("submit", (event) => {
-            if (isSubmitting) {
-                event.preventDefault();
-                return;
-            }
-            setSubmitting(true);
-        });
+                        <div id="file-list" class="file-list" aria-label="Selected documents"></div>
 
-        window.addEventListener("pageshow", () => { setSubmitting(false); });
-    </script>
+                        <div class="upload-footer">
+                            <p id="year-hint" class="hint">Aug&ndash;Dec use this year; Jan&ndash;Jul use the next.</p>
+                            <button class="button button-secondary" id="find-events" type="submit">Extract events <span aria-hidden="true">&rarr;</span></button>
+                        </div>
+
+                        <div id="progress-region" hidden>
+                            <progress id="batch-progress" value="0" max="1" aria-label="Documents processed"></progress>
+                        </div>
+
+                        <p id="processing-status" class="status-line" role="status" aria-live="polite" aria-atomic="true"></p>
+                        <noscript><p class="hint">Enable JavaScript for multiple PDFs and inline review. Without JavaScript, submit one PDF or paste text to continue.</p></noscript>
+                    </form>
+                </section>
+
+                <section class="schedule-section" aria-labelledby="schedule-title">
+                    <div class="section-heading schedule-heading">
+                        <div>
+                            <p class="eyebrow">02 / SCHEDULE</p>
+                            <h2 id="schedule-title">Review events <span id="event-count" class="count">0</span></h2>
+                        </div>
+                        <span class="hint" id="schedule-caption">Your extracted dates will appear here.</span>
+                    </div>
+
+                    <div id="empty-schedule" class="empty-schedule">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M7 14h4M7 17h7"/></svg>
+                        <h3>No events yet</h3>
+                        <p>Upload a syllabus to build your schedule.</p>
+                    </div>
+
+                    <div id="schedule" hidden>
+                        <div class="schedule-toolbar">
+                            <label class="select-all"><input type="checkbox" id="select-all">Select all</label>
+                            <span id="selection-count">0 selected</span>
+                        </div>
+                        <div class="group-controls" id="group-controls" aria-label="Select events by category"></div>
+                        <div class="schedule-columns" aria-hidden="true">
+                            <span></span><span>EVENT / SOURCE</span><span>DATE</span><span>TIME</span><span>ACTIONS</span>
+                        </div>
+                        <div id="event-list"></div>
+                    </div>
+
+                    <div class="undo-bar" id="undo-bar" hidden>
+                        <span id="undo-message" role="status"></span>
+                        <button type="button" id="undo-remove" class="text-button">Undo</button>
+                    </div>
+                </section>
+
+                <section class="export-panel" aria-labelledby="export-title">
+                    <div class="export-heading">
+                        <p class="eyebrow">03 / EXPORT</p>
+                        <h2 id="export-title">Ready for your calendar</h2>
+                        <p class="hint">Review dates against your syllabus before exporting.</p>
+                    </div>
+
+                    <div class="export-controls">
+                        <label for="reminder">Reminder<select id="reminder">
+                            <option value="">None</option>
+                            <option value="15">15 minutes before</option>
+                            <option value="60">1 hour before</option>
+                            <option value="1440">1 day before</option>
+                        </select></label>
+                        <button class="button" id="download" type="button" disabled>
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 20h14"/></svg>Download .ics
+                        </button>
+                    </div>
+
+                    <p class="hint export-note">All-day reminders are relative to the start of the day. Google Calendar drafts use Google Calendar&rsquo;s reminder settings.</p>
+                    <p class="status-line" id="export-status" role="status"></p>
+                </section>
+            </div>
+        </main>
+    </div>
 </body>
 </html>

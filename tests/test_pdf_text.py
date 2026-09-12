@@ -143,7 +143,7 @@ def test_image_only_pdf_reports_no_readable_text():
         response = client.post("/generate", data={
             "academic_start_year": "2025", "pdf": (io.BytesIO(pdf_with_image_page()), "scan.pdf"),
         })
-    assert b"contain any readable text" in response.data
+    assert b"no readable text" in response.data
     assert b"Review your events" not in response.data
 
 

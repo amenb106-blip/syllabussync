@@ -115,7 +115,7 @@ def test_pdf_text_flows_into_review(client, monkeypatch):
 def test_generate_rejects_empty_syllabus(client):
     response = client.post("/generate", data={"syllabus": "", "academic_start_year": "2026"})
 
-    assert b"give us anything to read" in response.data
+    assert b"Upload a PDF or paste syllabus text" in response.data
 
 
 def test_generate_rejects_invalid_academic_year(client):
@@ -265,3 +265,81 @@ def test_download_rejects_a_time_list_that_does_not_match_the_events(client):
     )
 
     assert b"could not be read" in response.data
+
+
+def test_api_extract_serializes_dates_and_times(client, monkeypatch):
+    captured = []
+    def extract(text, year):
+        captured.append((text, year))
+        return [_event('Quiz', date(2027, 1, 2), 'Assessments', True, time(9, 30))]
+    monkeypatch.setattr(app_module, 'extract_events', extract)
+    response = client.post('/api/extract', data={'syllabus': 'Quiz Jan 2', 'academic_start_year': '2026'})
+    assert response.status_code == 200
+    assert captured == [('Quiz Jan 2', 2026)]
+    assert response.json['events'][0]['date'] == '2027-01-02'
+    assert response.json['events'][0]['time'] == '09:30'
+    assert response.json['events'][0]['default_selected'] is True
+    assert response.json['warnings'] == []
+
+
+@pytest.mark.parametrize('data', [
+    {'syllabus': '', 'academic_start_year': '2026'},
+    {'syllabus': 'Quiz', 'academic_start_year': 'invalid'},
+    {'syllabus': 'Quiz', 'academic_start_year': '2101'},
+])
+def test_api_invalid_input_is_json(client, data):
+    response = client.post('/api/extract', data=data)
+    assert response.status_code == 400
+    assert response.json['error']['message']
+
+
+def test_api_extraction_failure_does_not_leak_exception(client, monkeypatch):
+    def fail(*args):
+        raise RuntimeError('secret provider error')
+    monkeypatch.setattr(app_module, 'extract_events', fail)
+    response = client.post('/api/extract', data={'syllabus': 'Quiz', 'academic_start_year': '2026'})
+    assert response.status_code == 502
+    assert 'secret' not in response.get_data(as_text=True)
+    assert response.json['error']['message'] == 'Unable to extract events. Try again shortly.'
+
+
+def test_api_pdf_warning_and_empty_results(client, monkeypatch):
+    def read(file, skipped_pages):
+        skipped_pages.extend([2, 4])
+        return 'syllabus'
+    monkeypatch.setattr(app_module, 'read_pdf_text', read)
+    _use_events(monkeypatch, [])
+    response = client.post('/api/extract', data={
+        'pdf': (io.BytesIO(b'pdf'), 'course.pdf'), 'academic_start_year': '2026',
+    })
+    assert response.status_code == 200
+    assert response.json['events'] == []
+    assert '2, 4' in response.json['warnings'][0]
+
+
+def test_api_unreadable_pdf(client):
+    response = client.post('/api/extract', data={
+        'pdf': (io.BytesIO(b'bad file'), 'course.pdf'), 'academic_start_year': '2026',
+    })
+    assert response.status_code == 400
+    assert response.json['error']['message']
+
+
+@pytest.mark.parametrize('reminder', ['', '15', '60', '1440'])
+def test_download_reminder(client, reminder):
+    response = client.post('/download', data={
+        'name': 'Final', 'event_date': '2026-12-12', 'include': '0', 'reminder_minutes': reminder,
+    })
+    assert response.status_code == 200
+    alarms = Calendar.from_ical(response.data).walk('VALARM')
+    assert len(alarms) == (1 if reminder else 0)
+    if reminder:
+        from datetime import timedelta
+        assert alarms[0].decoded('TRIGGER') == -timedelta(minutes=int(reminder))
+        assert alarms[0]['ACTION'] == 'DISPLAY'
+
+
+@pytest.mark.parametrize('reminder', ['0', '-15', '30', 'abc'])
+def test_download_rejects_invalid_reminders(client, reminder):
+    response = client.post('/download', data={'reminder_minutes': reminder})
+    assert response.status_code == 400

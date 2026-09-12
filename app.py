@@ -2,13 +2,23 @@ import io
 import os
 from datetime import date, time
 
-from flask import Flask, request, render_template, send_file
+from flask import Flask, request, render_template, send_file, jsonify
 
 from extractor import extract_events
 from calendar_maker import make_calendar
 from pdf_text import read_pdf_text
 
 app = Flask(__name__)
+
+REMINDER_CHOICES = ("", "15", "60", "1440")
+UNREADABLE_EVENTS = "Your event list could not be read. Please generate it again."
+
+
+class RequestError(Exception):
+    def __init__(self, message, status=400):
+        super().__init__(message)
+        self.message = message
+        self.status = status
 
 
 @app.context_processor
@@ -37,11 +47,61 @@ def get_academic_start_year():
     return academic_start_year
 
 
+def read_uploaded_pdf(uploaded_pdf, skipped_pages):
+    if not uploaded_pdf.filename.lower().endswith(".pdf"):
+        raise RequestError("Choose a PDF file.")
+
+    try:
+        text = read_pdf_text(uploaded_pdf, skipped_pages=skipped_pages)
+    except Exception:
+        raise RequestError("Unable to read that file. Make sure it is a readable PDF, or paste its text.")
+
+    if not text.strip():
+        raise RequestError("This PDF has no readable text. Paste the syllabus text instead.")
+    return text
+
+
+def skipped_pages_warning(skipped_pages):
+    page_numbers = ", ".join(str(number) for number in skipped_pages)
+    page_label = "page" if len(skipped_pages) == 1 else "pages"
+    verb = "was" if len(skipped_pages) == 1 else "were"
+    return (
+        f"PDF {page_label} {page_numbers} {verb} skipped because no readable text was found in the images. "
+        "This event list may be incomplete. Check those pages in your PDF or paste their text."
+    )
+
+
+def process_syllabus():
+    academic_start_year = get_academic_start_year()
+    if academic_start_year is None:
+        raise RequestError("Choose a valid academic start year between 2000 and 2100.")
+
+    uploaded_pdf = request.files.get("pdf")
+    pdf_warning = None
+
+    if uploaded_pdf and uploaded_pdf.filename:
+        skipped_pages = []
+        syllabus_text = read_uploaded_pdf(uploaded_pdf, skipped_pages)
+        if skipped_pages:
+            pdf_warning = skipped_pages_warning(skipped_pages)
+    else:
+        syllabus_text = request.form.get("syllabus", "")
+
+    if not syllabus_text.strip():
+        raise RequestError("Upload a PDF or paste syllabus text.")
+
+    try:
+        events = extract_events(syllabus_text, academic_start_year)
+    except Exception:
+        raise RequestError("Unable to extract events. Try again shortly.", 502)
+    return events, pdf_warning
+
+
 def group_events(events):
     grouped = {}
     for event in events:
         grouped.setdefault(event["category"], []).append(event)
-        
+
     result = []
     render_index = 0
     for category, items in grouped.items():
@@ -56,58 +116,84 @@ def group_events(events):
         })
     return result
 
+
+def serialize_event(event):
+    return {
+        **event,
+        "date": event["date"].isoformat(),
+        "time": event["time"].isoformat(timespec="minutes") if event.get("time") else None,
+    }
+
+
+def selected_indexes(values, event_count):
+    indexes = set()
+    for value in values:
+        try:
+            index = int(value)
+        except ValueError:
+            raise RequestError(UNREADABLE_EVENTS)
+        if not 0 <= index < event_count:
+            raise RequestError(UNREADABLE_EVENTS)
+        indexes.add(index)
+    return sorted(indexes)
+
+
+def selected_events(form):
+    names = form.getlist("name")
+    date_values = form.getlist("event_date")
+    time_values = form.getlist("event_time")
+
+    if len(names) != len(date_values) or (time_values and len(names) != len(time_values)):
+        raise RequestError(UNREADABLE_EVENTS)
+
+    events = []
+    for index in selected_indexes(form.getlist("include"), len(names)):
+        event_name = names[index].strip()
+        try:
+            event_date = date.fromisoformat(date_values[index])
+        except ValueError:
+            raise RequestError("Every included event needs a valid date.")
+
+        time_value = (time_values[index] if index < len(time_values) else "").strip()
+        try:
+            event_time = time.fromisoformat(time_value) if time_value else None
+        except ValueError:
+            raise RequestError("Every included event needs a valid time, or no time at all.")
+
+        if not event_name:
+            raise RequestError("Every included event needs a name.")
+        events.append({"name": event_name, "date": event_date, "time": event_time})
+    return events
+
+
 @app.route("/")
 def home():
     return render_template("index.html", current_year=date.today().year)
 
 
+@app.route("/api/extract", methods=["POST"])
+def api_extract():
+    try:
+        events, warning = process_syllabus()
+    except RequestError as error:
+        return jsonify(error={"message": error.message}), error.status
+
+    return jsonify(
+        events=[serialize_event(event) for event in events],
+        warnings=[warning] if warning else [],
+    )
+
+
 @app.route("/generate", methods=["POST"])
 def generate():
-    academic_start_year = get_academic_start_year()
-    if academic_start_year is None:
-        return message_page("Choose a valid academic start year between 2000 and 2100.")
+    try:
+        events, pdf_warning = process_syllabus()
+    except RequestError as error:
+        return message_page(error.message)
 
-    uploaded_pdf = request.files.get("pdf")
-    skipped_pages = []
-    pdf_warning = None
-
-    if uploaded_pdf and uploaded_pdf.filename:
-        try:
-            syllabus_text = read_pdf_text(uploaded_pdf, skipped_pages=skipped_pages)
-        except Exception:
-            return message_page(
-                "We couldn't read that file. Make sure it's a PDF, "
-                "or paste your syllabus text into the box instead."
-            )
-
-        if not syllabus_text.strip():
-            return message_page(
-                "That PDF doesn't contain any readable text - it looks like "
-                "a scan or a picture. Please copy your syllabus and paste it "
-                "into the text box instead."
-            )
-        if skipped_pages:
-            page_numbers = ", ".join(str(number) for number in skipped_pages)
-            page_label = "page" if len(skipped_pages) == 1 else "pages"
-            verb = "was" if len(skipped_pages) == 1 else "were"
-            pdf_warning = (
-                f"PDF {page_label} {page_numbers} {verb} skipped because no readable text was found in the images. "
-                "This event list may be incomplete. Check those pages in your PDF or paste their text."
-            )
-    else:
-        syllabus_text = request.form.get("syllabus", "")
-
-    if not syllabus_text.strip():
-        return message_page(
-            "You didn't give us anything to read. Paste your syllabus "
-            "into the box, or upload a PDF."
-        )
-
-    events = extract_events(syllabus_text, academic_start_year)
     if not events:
         return message_page(
-            "We couldn't find any dates in that syllabus. We understand "
-            'formats like "October 12", "Oct 12" and "10/5".'
+            "No dated events found. Check the syllabus or try another file."
             + (f" {pdf_warning}" if pdf_warning else "")
         )
 
@@ -116,47 +202,21 @@ def generate():
 
 @app.route("/download", methods=["POST"])
 def download():
-    names = request.form.getlist("name")
-    date_values = request.form.getlist("event_date")
-    time_values = request.form.getlist("event_time")
-    selected_values = request.form.getlist("include")
+    reminder_value = request.form.get("reminder_minutes", "")
+    if reminder_value not in REMINDER_CHOICES:
+        return message_page("Choose a valid reminder interval."), 400
 
-    if len(names) != len(date_values) or (time_values and len(names) != len(time_values)):
-        return message_page("Your event list could not be read. Please generate it again.")
-
-    events = []
-    selected_indexes = set()
-    for value in selected_values:
-        try:
-            index = int(value)
-        except ValueError:
-            return message_page("Your event list could not be read. Please generate it again.")
-        if not 0 <= index < len(names):
-            return message_page("Your event list could not be read. Please generate it again.")
-        selected_indexes.add(index)
-
-    for index in sorted(selected_indexes):
-        event_name = names[index].strip()
-        try:
-            event_date = date.fromisoformat(date_values[index])
-        except ValueError:
-            return message_page("Every included event needs a valid date.")
-
-        time_value = (time_values[index] if index < len(time_values) else "").strip()
-        try:
-            event_time = time.fromisoformat(time_value) if time_value else None
-        except ValueError:
-            return message_page("Every included event needs a valid time, or no time at all.")
-
-        if not event_name:
-            return message_page("Every included event needs a name.")
-        events.append({"name": event_name, "date": event_date, "time": event_time})
+    try:
+        events = selected_events(request.form)
+    except RequestError as error:
+        return message_page(error.message)
 
     if not events:
         return message_page("Select at least one event to create a calendar.")
 
+    calendar = make_calendar(events, reminder_minutes=int(reminder_value) if reminder_value else None)
     return send_file(
-        io.BytesIO(make_calendar(events)),
+        io.BytesIO(calendar),
         mimetype="text/calendar",
         as_attachment=True,
         download_name="syllabus.ics",
@@ -164,5 +224,4 @@ def download():
 
 
 if __name__ == "__main__":
-
     app.run(debug=os.environ.get("FLASK_DEBUG") == "1")

@@ -4,7 +4,6 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Review Events | SyllabusSync</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=asset_version('style.css')) }}">
 </head>
 <body>
@@ -22,7 +21,7 @@
         <div class="review-heading">
             <div>
                 <h1 class="review-title">Review your events</h1>
-                <p class="subtitle">Check these events against your syllabus. Edit names, dates, and times, and untick anything that doesn't belong. A blank time means an all-day event.</p>
+                <p class="subtitle">Review dates against your syllabus. A blank time means all day.</p>
             </div>
             <p class="summary-pill"><span id="date-count">0</span> dates found &middot; <span id="selected-count">0</span> selected</p>
         </div>
@@ -39,7 +38,7 @@
                     <div class="event-group-heading">
                         <div>
                             <h2 id="{{ group_id }}-heading">{{ group.label }}</h2>
-                            <p>Choose this whole group, or edit individual events below.</p>
+                            <p>Select and edit events.</p>
                         </div>
                         <label class="select-group">
                             <input type="checkbox" class="category-toggle" data-group="{{ group_id }}" {% if group.all_selected %}checked{% endif %} aria-label="Include all {{ group.label }} events">
@@ -50,7 +49,7 @@
                     <div class="event-table">
                         <div class="event-grid">
                             <div class="event-grid-header" aria-hidden="true">
-                                <span>Include</span><span>Event name</span><span>Date</span><span>Time</span><span>Why it's here</span>
+                                <span>Include</span><span>Event name</span><span>Date</span><span>Time</span><span>Details</span>
                             </div>
                             {% for event in group["items"] %}
                             <div class="event-row">
@@ -82,12 +81,12 @@
 
             <div class="action-bar">
                 <div class="action-bar-inner">
-                    <p class="selection-summary"><strong id="bar-selected-count">0 events</strong> will be added to your calendar</p>
+                    <p class="selection-summary"><strong id="bar-selected-count">0 events</strong> selected for export</p>
                     <div class="action-buttons">
                         <a class="link-secondary" href="/">Start over</a>
                         <button class="button" type="submit">
                             <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 20h14"></path></svg>
-                            Download calendar (.ics)
+                            Download .ics
                         </button>
                     </div>
                 </div>

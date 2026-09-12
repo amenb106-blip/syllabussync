@@ -28,6 +28,8 @@ DEADLINE_HEADING = re.compile(
     r"\b(?:assignment|homework|hw|due|deliverable|deadline|assessment|lab|project|exam|quiz)",
     re.IGNORECASE,
 )
+WEEKLY_HEADING = re.compile(r"^\s*Week(\s{2,})(?=\S)", re.IGNORECASE)
+WEEK_LABEL = re.compile(r"\d{1,2}|Finals?|week", re.IGNORECASE)
 
 
 def _cell_dates(text):
@@ -117,56 +119,72 @@ def read_pdf_text(uploaded_file, *, skipped_pages=None):
     with pdfplumber.open(BytesIO(data)) as document:
         for index, page in enumerate(reader.pages, start=1):
             table_page = document.pages[index - 1] if index <= len(document.pages) else None
-            text = table_page.extract_text(layout=True, x_density=3) or "" if table_page else ""
+
+            text = ""
+            if table_page is not None:
+                text = table_page.extract_text(layout=True, x_density=3) or ""
             if not text.strip() and "/Contents" in page:
                 text = page.extract_text(extraction_mode="layout", layout_mode_space_vertically=False) or ""
-            if table_page is not None and skipped_pages is not None and _looks_scanned(table_page, text):
-                skipped_pages.append(index)
-            if text.strip() and table_page is not None:
-                table_text = _replace_dated_tables(table_page)
-                if table_text is not None:
-                    text = table_text
+
+            if table_page is not None:
+                if skipped_pages is not None and _looks_scanned(table_page, text):
+                    skipped_pages.append(index)
+                if text.strip():
+                    table_text = _replace_dated_tables(table_page)
+                    if table_text is not None:
+                        text = table_text
+
             pages.append(text)
     return _join_weekly_cells(pages)
 
 
+def _weekly_column_starts(line):
+    heading = WEEKLY_HEADING.match(line)
+    gap = len(heading.group(1))
+    cell = re.compile(r"\S.*?(?=\s{" + str(gap) + r",}|$)")
+    starts = [match.start() for match in cell.finditer(line)]
+    return starts if len(starts) >= 2 else None
+
+
+def _column_values(line, column_starts):
+    values = []
+    for index, start in enumerate(column_starts):
+        end = column_starts[index + 1] if index + 1 < len(column_starts) else None
+        values.append(" ".join(line[start:end].split()))
+    return values
+
+
 def _join_weekly_cells(pages):
     lines = []
-    columns = None
-    cells = None
+    column_starts = None
+    week_cells = None
 
     def flush():
-        nonlocal cells
-        if cells is not None:
-            lines.extend(" ".join(parts) for parts in cells[1:] if parts)
-            cells = None
+        nonlocal week_cells
+        if week_cells is not None:
+            lines.extend(" ".join(parts) for parts in week_cells[1:] if parts)
+            week_cells = None
 
     for text in pages:
         for line in text.splitlines():
-            weekly_heading = re.match(r"^\s*Week(\s{2,})(?=\S)", line, re.IGNORECASE)
-            if weekly_heading:
+            if WEEKLY_HEADING.match(line):
                 flush()
-                gap = len(weekly_heading.group(1))
-                columns = [match.start() for match in re.finditer(r"\S.*?(?=\s{" + str(gap) + r",}|$)", line)]
-                if len(columns) < 2:
-                    columns = None
+                column_starts = _weekly_column_starts(line)
                 continue
 
-            if columns is not None and line.strip():
-                first = line[:columns[1]].strip()
-                if not first or re.fullmatch(r"\d{1,2}|Finals?|week", first, re.IGNORECASE):
-                    if first and first.lower() != "week":
+            if column_starts is not None and line.strip():
+                label = line[:column_starts[1]].strip()
+                if not label or WEEK_LABEL.fullmatch(label):
+                    if label and label.lower() != "week":
                         flush()
-                        cells = [[] for _ in columns]
-                    if cells is not None:
-                        for index, start in enumerate(columns):
-                            end = columns[index + 1] if index + 1 < len(columns) else None
-                            value = " ".join(line[start:end].split())
+                        week_cells = [[] for _ in column_starts]
+                    if week_cells is not None:
+                        for index, value in enumerate(_column_values(line, column_starts)):
                             if value:
-                                cells[index].append(value)
+                                week_cells[index].append(value)
                         continue
                 flush()
-                columns = None
+                column_starts = None
 
             lines.append(" ".join(line.split()))
         flush()
